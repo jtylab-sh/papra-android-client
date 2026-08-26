@@ -6,6 +6,12 @@ on:
   pull_request:
     branches: [main]
 
+# A newer push supersedes the running build: cancel it instead of finishing
+# a release nobody will install. The newer run cuts its own complete release.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     runs-on: ubuntu-latest
