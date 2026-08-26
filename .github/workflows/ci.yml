@@ -102,7 +102,7 @@ jobs:
           set -euo pipefail
           # versionCode must only ever grow; the run number does.
           jq --arg v "$VERSION" --argjson c "${{ github.run_number }}" \
-            '.expo.version = $v | .expo.android.versionCode = c' app.json > app.json.tmp
+            '.expo.version = $v | .expo.android.versionCode = $c' app.json > app.json.tmp
           mv app.json.tmp app.json
       - name: Generate android project
         run: npx expo prebuild --platform android --no-install
