@@ -106,17 +106,30 @@ jobs:
           mv app.json.tmp app.json
       - name: Generate android project
         run: npx expo prebuild --platform android --no-install
-      - name: Wire release signing
+      - name: Decode keystore
         env:
           KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
         run: |
           set -euo pipefail
-          echo "$KEYSTORE_B64" | base64 -d > android/app/release.keystore
+          [ -n "$KEYSTORE_B64" ] || { echo "KEYSTORE_B64 secret is empty or missing"; exit 1; }
+          # tr strips CR/whitespace a copy-paste may have added; base64 only ignores newlines.
+          printf '%s' "$KEYSTORE_B64" | tr -d ' \t\r\n' | base64 -d > android/app/release.keystore
+          ls -la android/app/release.keystore
+      - name: Patch gradle signing
+        run: |
+          set -euo pipefail
           # Add a release signingConfig sourced from env…
           perl -0pi -e 's/(signingConfigs \{)/$1\n        release {\n            storeFile file("release.keystore")\n            storePassword System.getenv("KEYSTORE_PASSWORD")\n            keyAlias System.getenv("KEY_ALIAS")\n            keyPassword System.getenv("KEY_PASSWORD")\n        }/' android/app/build.gradle
           # …and make the release buildType use it instead of the debug key.
           perl -0pi -e 's/(release \{(?:(?!\}).)*?)signingConfig signingConfigs\.debug/$1signingConfig signingConfigs.release/s' android/app/build.gradle
-          grep -q 'signingConfigs.release' android/app/build.gradle || { echo "signing patch failed"; exit 1; }
+      - name: Verify signing patch
+        run: |
+          grep -q 'signingConfigs.release' android/app/build.gradle || {
+            echo "signing patch did not match; generated signing/buildTypes section follows:"
+            sed -n '/signingConfigs {/,/^}/p' android/app/build.gradle
+            sed -n '/buildTypes {/,/^}/p' android/app/build.gradle
+            exit 1
+          }
       - name: Build APK
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
