@@ -96,6 +96,9 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
+      # Caches the Gradle distribution and dependency cache between runs —
+      # cuts the APK build from ~20+ min (cold) to roughly half.
+      - uses: gradle/actions/setup-gradle@v4
       - run: npm ci
       - name: Stamp version into app.json
         run: |
