@@ -25,16 +25,16 @@ jobs:
       - name: Type-check
         run: npx tsc --noEmit
 
-  release:
-    # Every push to main releases the next version. The bump is read from the
-    # conventional-commit subjects since the last tag: `type!:` or a
-    # `BREAKING CHANGE:` footer is major, `feat:` is minor, anything else patch —
-    # except while the major is still 0, where breaking is capped at minor.
+  version:
+    # Computes the next version from the conventional-commit subjects since the
+    # last tag: `type!:` or a `BREAKING CHANGE:` footer is major, `feat:` is
+    # minor, anything else patch — except while the major is still 0, where
+    # breaking is capped at minor. The release itself is created by the `apk`
+    # job AFTER a successful build, with the APK attached — so a failed or
+    # cancelled build leaves no empty release behind.
     if: github.event_name == 'push'
     needs: test
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:
@@ -42,8 +42,6 @@ jobs:
         with:
           fetch-depth: 0
       - id: version
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           last=$(git tag --list 'v*' --sort=-v:refname | head -1)
@@ -80,18 +78,17 @@ jobs:
           esac
           version="$major.$minor.$patch"
           echo "$bump bump: $base -> $version"
-          gh release create "v$version" --target "$GITHUB_SHA" --title "v$version" --generate-notes
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
   apk:
-    # Builds the signed APK and attaches it to the release `release` just cut.
-    needs: release
-    if: needs.release.outputs.version != ''
+    # Builds the signed APK, then cuts the release with the APK attached.
+    needs: version
+    if: needs.version.outputs.version != ''
     runs-on: ubuntu-latest
     permissions:
       contents: write
     env:
-      VERSION: ${{ needs.release.outputs.version }}
+      VERSION: ${{ needs.version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -145,11 +142,12 @@ jobs:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: cd android && ./gradlew --no-daemon assembleRelease
-      - name: Upload APK to release
+      - name: Create release with APK
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           apk="papra-android-client-v$VERSION.apk"
           mv android/app/build/outputs/apk/release/app-release.apk "$apk"
-          gh release upload "v$VERSION" "$apk"
+          # Tag + release + asset in one atomic step — only reached on a green build.
+          gh release create "v$VERSION" --target "$GITHUB_SHA" --title "v$VERSION" --generate-notes "$apk"
