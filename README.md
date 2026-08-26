@@ -8,8 +8,9 @@ project.
 ## Features
 
 - **Connect to any self-hosted Papra instance** — enter the server URL on first run.
-- **Sign in with email & password** (Papra's better-auth session, using the `papra://` app scheme that
-  Papra trusts out of the box) **or with an API key** for accounts using two-factor auth or older servers.
+- **Sign in with email & password**, including **two-factor (TOTP) accounts** — Papra's better-auth
+  session over the `papra://` app scheme that Papra trusts out of the box. The device is remembered
+  after the first code.
 - **Browse documents** with tags, size, dates, custom properties and extracted OCR content; search by
   name offline, or submit the search to the server for full-content search.
 - **Upload** via in-app file picker, the Android share sheet (share any file to Papra), or the built-in
@@ -28,13 +29,10 @@ Grab the APK from the [latest release](../../releases/latest), or add this repo 
 ## Server requirements
 
 - A reachable Papra instance (any URL — LAN IP, VPN hostname, public domain).
-- **Email & password sign-in** relies on Papra trusting the `papra://` app scheme. Recent Papra versions
-  do this by default (`TRUSTED_APP_SCHEMES` defaults to `papra://`). If your server is older or overrides
-  that variable, either add `papra://` to `TRUSTED_APP_SCHEMES` or just use an API key.
-- **API key mode**: create a key in Papra under your user menu → API keys. Permissions needed:
-  `documents:read`, `tags:read` to browse; `documents:create` to upload; `documents:update`,
-  `documents:delete` for trash/restore.
-- Accounts with two-factor auth must use an API key (the app does not implement the 2FA flow).
+- **Sign-in** relies on Papra trusting the `papra://` app scheme. Recent Papra versions do this by
+  default (`TRUSTED_APP_SCHEMES` defaults to `papra://`); if your server is older or overrides that
+  variable, add `papra://` to `TRUSTED_APP_SCHEMES`.
+- Two-factor accounts sign in with their TOTP code; backup codes are not supported in-app.
 
 ## Offline sync notes
 

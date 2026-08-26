@@ -7,6 +7,7 @@
  * The client is created per server URL (better-auth fixes baseURL at creation).
  */
 import { expoClient } from "@better-auth/expo/client";
+import { twoFactorClient } from "better-auth/client/plugins";
 import { createAuthClient } from "better-auth/react";
 import * as SecureStore from "expo-secure-store";
 
@@ -21,6 +22,9 @@ function buildClient(serverUrl: string) {
         storagePrefix: "papra",
         storage: SecureStore,
       }),
+      // Papra's server always registers better-auth's twoFactor plugin; this is
+      // the client half (signIn.email -> twoFactorRedirect -> verifyTotp).
+      twoFactorClient(),
     ],
   });
 }
