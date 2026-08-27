@@ -5,11 +5,13 @@
  */
 import * as BackgroundTask from "expo-background-task";
 import { Directory, File, Paths } from "expo-file-system";
+import * as FileSystemLegacy from "expo-file-system/legacy";
 import * as Network from "expo-network";
 import * as TaskManager from "expo-task-manager";
 import { listDocuments, documentFileUrl, type PapraDocument } from "./papra";
 import {
   getCachedDocument,
+  getMeta,
   pruneDocuments,
   setDocumentFileUri,
   setMeta,
@@ -79,6 +81,43 @@ export async function ensureLocalFile(id: string): Promise<string> {
   return file.uri;
 }
 
+function displayFileName(cached: { name: string; mimeType: string }): string {
+  const ext = extensionFor(cached);
+  const base = (cached.name || `document.${ext}`)
+    .replace(/[\\/:*?"<>|\x00-\x1f]+/g, "_")
+    .slice(0, 120);
+  return base.toLowerCase().endsWith(`.${ext}`) ? base : `${base}.${ext}`;
+}
+
+/**
+ * Best-effort export of one offline blob into the user-chosen SAF folder
+ * (Settings -> "Export copies to folder"). The private mirror stays the
+ * source of truth; export failures never fail a sync.
+ * ponytail: base64 round-trip through the legacy FS API — the only way to
+ * write SAF content:// URIs; fine for scanned documents, slow for huge files.
+ */
+async function exportCopy(id: string, exportDirUri: string): Promise<void> {
+  if (!exportDirUri) return;
+  const cached = getCachedDocument(id);
+  if (!cached?.fileUri) return;
+  const metaKey = `exported:${id}`;
+  if (getMeta(metaKey) === exportDirUri) return; // already exported to this folder
+  try {
+    const data = await FileSystemLegacy.readAsStringAsync(cached.fileUri, {
+      encoding: FileSystemLegacy.EncodingType.Base64,
+    });
+    const target = await FileSystemLegacy.StorageAccessFramework.createFileAsync(
+      exportDirUri,
+      displayFileName(cached),
+      cached.mimeType || "application/octet-stream",
+    );
+    await FileSystemLegacy.writeAsStringAsync(target, data, { encoding: FileSystemLegacy.EncodingType.Base64 });
+    setMeta(metaKey, exportDirUri);
+  } catch {
+    /* folder revoked/full — retried next sync */
+  }
+}
+
 /**
  * The mirror stores blobs as <id>.<ext> (stable, collision-free). Anything
  * user-visible (share sheet, "open with") gets a cache copy carrying the
@@ -131,6 +170,7 @@ export async function syncNow(opts: { respectWifiOnly?: boolean; onProgress?: (d
         failed++;
       }
     }
+    await exportCopy(id, s.offlineExportDirUri);
     opts.onProgress?.(++done, ids.length);
   }
   setMeta("lastSyncAt", new Date().toISOString());

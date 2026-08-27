@@ -22,6 +22,7 @@ function draftSettings(serverUrl: string): Settings {
     syncWifiOnly: true,
     biometricLock: false,
     lockGraceMinutes: 5,
+    offlineExportDirUri: "",
   };
 }
 

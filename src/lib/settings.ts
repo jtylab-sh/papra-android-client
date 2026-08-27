@@ -19,6 +19,8 @@ export interface Settings {
   biometricLock: boolean;
   /** minutes the app stays unlocked after leaving it; 0 = lock immediately */
   lockGraceMinutes: number;
+  /** SAF tree URI; when set, offline copies are also exported there ("" = off) */
+  offlineExportDirUri: string;
 }
 
 const DEFAULTS: Settings = {
@@ -32,6 +34,7 @@ const DEFAULTS: Settings = {
   syncWifiOnly: true,
   biometricLock: false,
   lockGraceMinutes: 5,
+  offlineExportDirUri: "",
 };
 
 const KEY = "papra.settings";

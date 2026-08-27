@@ -1,3 +1,4 @@
+import * as FileSystemLegacy from "expo-file-system/legacy";
 import * as LocalAuthentication from "expo-local-authentication";
 import { router } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
@@ -150,6 +151,28 @@ export default function SettingsScreen() {
             <Row style={{ justifyContent: "space-between", marginTop: spacing.sm }}>
               <Text variant="bodyLarge">Wi-Fi only</Text>
               <Switch value={settings.syncWifiOnly} onValueChange={(v: boolean) => update({ syncWifiOnly: v })} />
+            </Row>
+            <Row style={{ justifyContent: "space-between", marginTop: spacing.sm }}>
+              <View style={{ flex: 1 }}>
+                <Text variant="bodyLarge">Export copies to folder</Text>
+                <Muted>
+                  {settings.offlineExportDirUri
+                    ? decodeURIComponent(settings.offlineExportDirUri.split("%3A").pop() ?? "chosen folder")
+                    : "Offline copies stay in app storage; pick a folder to also get browsable copies."}
+                </Muted>
+              </View>
+              <Button
+                label={settings.offlineExportDirUri ? "Clear" : "Choose"}
+                kind="ghost"
+                onPress={async () => {
+                  if (settings.offlineExportDirUri) {
+                    update({ offlineExportDirUri: "" });
+                    return;
+                  }
+                  const perm = await FileSystemLegacy.StorageAccessFramework.requestDirectoryPermissionsAsync();
+                  if (perm.granted) update({ offlineExportDirUri: perm.directoryUri });
+                }}
+              />
             </Row>
           </>
         )}
