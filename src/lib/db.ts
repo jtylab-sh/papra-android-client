@@ -90,15 +90,29 @@ export function upsertDocuments(docs: PapraDocument[]): void {
   }
 }
 
-export function listCachedDocuments(search = ""): CachedDocument[] {
+export function listCachedDocuments(search = "", limit = -1, offset = 0): CachedDocument[] {
   const d = getDb();
+  // limit -1 = no limit (SQLite convention); offset only applies with a limit.
   const rows = search
     ? d.getAllSync(
-        "select * from documents where name like ? or originalName like ? order by createdAt desc",
-        [`%${search}%`, `%${search}%`],
+        "select * from documents where name like ? or originalName like ? order by createdAt desc limit ? offset ?",
+        [`%${search}%`, `%${search}%`, limit, offset],
       )
-    : d.getAllSync("select * from documents order by createdAt desc");
+    : d.getAllSync("select * from documents order by createdAt desc limit ? offset ?", [limit, offset]);
   return (rows as Record<string, unknown>[]).map(toCached);
+}
+
+export function countCachedDocuments(search = ""): number {
+  const d = getDb();
+  const row = (
+    search
+      ? d.getFirstSync("select count(*) as n from documents where name like ? or originalName like ?", [
+          `%${search}%`,
+          `%${search}%`,
+        ])
+      : d.getFirstSync("select count(*) as n from documents")
+  ) as { n: number } | null;
+  return row?.n ?? 0;
 }
 
 export function getCachedDocument(id: string): CachedDocument | null {

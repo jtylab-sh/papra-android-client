@@ -5,7 +5,7 @@ import { FlatList, RefreshControl, View } from "react-native";
 import { Card, IconButton, Text, useTheme } from "react-native-paper";
 import { Input, Muted, Row, TagChip, formatBytes, formatDate } from "../../components/ui";
 import { spacing, type AppTheme } from "../../constants/theme";
-import { listCachedDocuments, type CachedDocument } from "../../lib/db";
+import { countCachedDocuments, listCachedDocuments, type CachedDocument } from "../../lib/db";
 import { listDocuments } from "../../lib/papra";
 import { getSettings, isConnected } from "../../lib/settings";
 import { syncMetadata, upsertFromSearch } from "../../lib/screens-helpers";
@@ -17,9 +17,21 @@ export default function DocumentsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [ready, setReady] = useState(false);
 
+  // Paged reads from the cache — never the whole library at once.
+  const PAGE = 30;
+  const [total, setTotal] = useState(0);
+
   const loadLocal = useCallback((q: string) => {
-    setDocs(listCachedDocuments(q));
+    setDocs(listCachedDocuments(q, PAGE, 0));
+    setTotal(countCachedDocuments(q));
   }, []);
+
+  const loadMore = useCallback(() => {
+    setDocs((prev) => {
+      if (prev.length >= total) return prev;
+      return [...prev, ...listCachedDocuments(search, PAGE, prev.length)];
+    });
+  }, [search, total]);
 
   useFocusEffect(
     useCallback(() => {
@@ -33,7 +45,7 @@ export default function DocumentsScreen() {
         setReady(true);
         loadLocal(search);
         // First run: pull metadata so the list isn't empty.
-        if (listCachedDocuments("").length === 0) {
+        if (countCachedDocuments() === 0) {
           syncMetadata()
             .then(() => active && loadLocal(search))
             .catch(() => {});
@@ -65,7 +77,9 @@ export default function DocumentsScreen() {
       upsertFromSearch(documents);
       // Show server results (content search included), newest first.
       const ids = new Set(documents.map((d) => d.id));
-      setDocs(listCachedDocuments("").filter((d) => ids.has(d.id)));
+      const found = listCachedDocuments().filter((d) => ids.has(d.id));
+      setDocs(found);
+      setTotal(found.length);
     } catch {
       loadLocal(search);
     }
@@ -93,6 +107,15 @@ export default function DocumentsScreen() {
         contentContainerStyle={{ padding: spacing.md }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={theme.colors.primary} />}
         ListEmptyComponent={<Muted>No documents. Pull to refresh.</Muted>}
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.5}
+        ListFooterComponent={
+          docs.length > 0 ? (
+            <Muted>
+              {docs.length < total ? `${docs.length} of ${total}` : `${total} document${total === 1 ? "" : "s"}`}
+            </Muted>
+          ) : null
+        }
         renderItem={({ item }) => <DocumentRow doc={item} />}
       />
     </View>
