@@ -138,6 +138,12 @@ function orgPath(s: Settings, rest: string): string {
   return `/api/organizations/${s.organizationId}${rest}`;
 }
 
+/** Server version from the public /api/config endpoint ("" when not exposed). */
+export async function getServerVersion(): Promise<string> {
+  const json = await papraRequest<{ config?: { version?: string } }>("/api/config");
+  return json.config?.version ?? "";
+}
+
 export async function listOrganizations(settings?: Settings): Promise<PapraOrganization[]> {
   const json = await papraRequest<{ organizations: PapraOrganization[] }>("/api/organizations", { settings });
   return json.organizations ?? [];

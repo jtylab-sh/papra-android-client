@@ -17,7 +17,7 @@ import { spacing, type AppTheme } from "~/constants/theme";
 import { requestPinWidget } from "react-native-android-widget";
 import { getAuthClient } from "~/lib/auth";
 import { requestNotificationPermission } from "~/lib/notifications";
-import { createOrganization, listOrganizations, type PapraOrganization } from "~/lib/papra";
+import { createOrganization, getServerVersion, listOrganizations, type PapraOrganization } from "~/lib/papra";
 import { countCachedDocuments, getMeta } from "~/lib/db";
 import { countOfflineOnDisk } from "~/lib/sync";
 import { getSettings, saveSettings, type Settings } from "~/lib/settings";
@@ -62,7 +62,14 @@ export default function SettingsScreen() {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [progress, setProgress] = useState<string>("");
   const [syncing, setSyncing] = useState(false);
+  const [serverVersion, setServerVersion] = useState("");
   const lastSyncAt = getMeta("lastSyncAt");
+
+  useEffect(() => {
+    getServerVersion()
+      .then(setServerVersion)
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     getSettings().then((s) => {
@@ -261,6 +268,7 @@ export default function SettingsScreen() {
         <Muted>Server</Muted>
         <View style={{ marginTop: 8 }}>
           <KeyValue label="URL" value={settings.serverUrl} />
+          <KeyValue label="Server version" value={serverVersion} />
           <KeyValue label="Organization" value={settings.organizationName || settings.organizationId} />
           <KeyValue label="Signed in as" value={settings.accountEmail || "unknown"} />
         </View>

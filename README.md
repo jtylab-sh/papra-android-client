@@ -10,7 +10,8 @@ full offline copy on your phone. Not affiliated with the Papra project.
 ## Features
 
 - Works with any self-hosted Papra instance. Sign in with email and password; two-factor (TOTP)
-  accounts work and the device is remembered after the first code.
+  accounts work and the device is remembered after the first code. Settings shows the server
+  version next to your account.
 - Material You: on Android 12+ the colors follow your wallpaper, and there is a themed app icon.
 - Browse and search documents using Papra's real query grammar (`AND`/`OR`/`NOT`, `"quoted
   phrases"`, `tag:`, `name:`, `content:`, `created:`, `has:`), with results streaming in as you
