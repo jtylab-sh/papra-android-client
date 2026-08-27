@@ -1,3 +1,4 @@
+import * as FileSystemLegacy from "expo-file-system/legacy";
 /**
  * Minimal typed client for Papra's REST API.
  *
@@ -93,6 +94,7 @@ interface RequestOptions {
   method?: string;
   query?: Record<string, string | number | undefined>;
   body?: unknown; // JSON-serialized unless FormData
+  timeoutMs?: number; // default 25s; uploads pass more
   settings?: Settings;
 }
 
@@ -111,13 +113,26 @@ export async function papraRequest<T = unknown>(path: string, opts: RequestOptio
     headers["Content-Type"] = "application/json";
     body = JSON.stringify(opts.body);
   }
+  // Without a deadline a dead connection hangs for minutes (stuck loaders,
+  // endless pull-to-refresh) — abort instead and let the caller cope.
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), opts.timeoutMs ?? 25_000);
   let res: Response;
   try {
-    res = await fetch(url.toString(), { method: opts.method ?? "GET", headers, body, credentials: "omit" });
+    res = await fetch(url.toString(), {
+      method: opts.method ?? "GET",
+      headers,
+      body,
+      credentials: "omit",
+      signal: ac.signal,
+    });
   } catch (cause) {
     // Every screen action funnels through here, so this one check covers them all.
     if (await notifyIfOffline()) throw new ApiError(0, "You are offline");
-    throw new ApiError(0, `Cannot reach ${s.serverUrl}`);
+    if (ac.signal.aborted) throw new ApiError(0, `${s.serverUrl} did not answer in time`);
+    throw new ApiError(0, `Cannot reach ${s.serverUrl} (${cause instanceof Error ? cause.message : String(cause)})`);
+  } finally {
+    clearTimeout(timer);
   }
   if (!res.ok) {
     let message = `${res.status} ${res.statusText}`;
@@ -423,6 +438,13 @@ export async function removeTagFromDocument(documentId: string, tagId: string): 
 /** Upload a local file. RN FormData takes {uri, name, type}. */
 export async function uploadDocument(file: { uri: string; name: string; mimeType?: string }): Promise<PapraDocument> {
   const s = await getSettings();
+  if (file.uri.startsWith("file://")) {
+    // A stale picker/scan uri fails inside fetch dressed up as a network
+    // error — check first so the message tells the truth. 410 also keeps the
+    // offline queue from retrying a file that is gone.
+    const info = await FileSystemLegacy.getInfoAsync(file.uri).catch(() => null);
+    if (!info?.exists) throw new ApiError(410, "The file no longer exists on this phone");
+  }
   const form = new FormData();
   form.append("file", {
     uri: file.uri,
@@ -433,6 +455,7 @@ export async function uploadDocument(file: { uri: string; name: string; mimeType
     method: "POST",
     body: form,
     settings: s,
+    timeoutMs: 180_000, // big scans on slow uplinks are legitimate
   });
   return json.document ?? (json as unknown as PapraDocument);
 }

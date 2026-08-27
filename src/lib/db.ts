@@ -116,8 +116,12 @@ function whereClause(search: string, synced?: boolean): { where: string; args: s
   const conds: string[] = [];
   const args: string[] = [];
   if (search) {
-    conds.push("(name like ? or originalName like ?)");
-    args.push(`%${search}%`, `%${search}%`);
+    // Local fallback search has no server grammar: strip tag:/quotes and
+    // match the remaining text against names and tag names (tagsJson).
+    // ponytail: one contains-match, no per-token AND — server does the real grammar.
+    const term = search.replace(/\btag:/gi, "").replace(/"/g, "").trim();
+    conds.push("(name like ? or originalName like ? or tagsJson like ?)");
+    args.push(`%${term}%`, `%${term}%`, `%${term}%`);
   }
   if (synced === true) conds.push("fileUri is not null");
   if (synced === false) conds.push("fileUri is null");
