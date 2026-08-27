@@ -74,12 +74,19 @@ export function Card({ children, style }: PropsWithChildren<{ style?: ViewStyle 
   );
 }
 
-export function TagChip({ name, color }: { name: string; color?: string }) {
+export function TagChip({ name, color, onClose }: { name: string; color?: string; onClose?: () => void }) {
   const theme = useTheme<AppTheme>();
   // Tags carry a server-defined hex colour — keep it as the chip's own tint.
   const tint = color || theme.colors.primary;
   return (
-    <Chip mode="outlined" compact style={[styles.chip, { borderColor: tint }]} textStyle={{ color: tint }}>
+    <Chip
+      mode="outlined"
+      compact
+      onClose={onClose}
+      closeIconAccessibilityLabel={onClose ? `Remove ${name}` : undefined}
+      style={[styles.chip, { borderColor: tint }]}
+      textStyle={{ color: tint }}
+    >
       {name}
     </Chip>
   );

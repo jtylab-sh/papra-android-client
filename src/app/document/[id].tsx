@@ -4,11 +4,19 @@ import * as Sharing from "expo-sharing";
 import { Stack, router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { Alert, ScrollView, View } from "react-native";
-import { Text, useTheme } from "react-native-paper";
+import { Button as PaperButton, Chip, Dialog, Portal, Text, useTheme } from "react-native-paper";
 import { Button, Card, KeyValue, Muted, TagChip, formatBytes, formatDate } from "../../components/ui";
 import { spacing, type AppTheme } from "../../constants/theme";
 import { getCachedDocument, upsertDocuments, type CachedDocument } from "../../lib/db";
-import { getDocument, trashDocument, type PapraDocument } from "../../lib/papra";
+import {
+  addTagToDocument,
+  getDocument,
+  listTags,
+  removeTagFromDocument,
+  trashDocument,
+  type PapraDocument,
+  type PapraTag,
+} from "../../lib/papra";
 import { localFileNamedForUser } from "../../lib/sync";
 
 export default function DocumentScreen() {
@@ -18,7 +26,7 @@ export default function DocumentScreen() {
   const [live, setLive] = useState<PapraDocument | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
 
-  useEffect(() => {
+  const reload = useCallback(() => {
     if (!id) return;
     setCached(getCachedDocument(id));
     getDocument(id)
@@ -31,6 +39,45 @@ export default function DocumentScreen() {
         /* offline — cached copy is the truth */
       });
   }, [id]);
+
+  useEffect(() => {
+    reload();
+  }, [reload]);
+
+  // --- tag editing (server required; buttons no-op offline with an alert) ---
+  const [tagPicker, setTagPicker] = useState<PapraTag[] | null>(null);
+
+  const openTagPicker = useCallback(async () => {
+    try {
+      const all = await listTags();
+      const current = new Set((getCachedDocument(id!)?.tags ?? []).map((t) => t.id));
+      setTagPicker(all.filter((t) => !current.has(t.id)));
+    } catch (e) {
+      Alert.alert("Failed", e instanceof Error ? e.message : String(e));
+    }
+  }, [id]);
+
+  const addTag = useCallback(
+    async (tag: PapraTag) => {
+      setTagPicker(null);
+      try {
+        await addTagToDocument(id!, tag.id);
+        reload();
+      } catch (e) {
+        Alert.alert("Failed", e instanceof Error ? e.message : String(e));
+      }
+    },
+    [id, reload],
+  );
+
+  const removeTag = useCallback(
+    (tag: PapraTag) => {
+      removeTagFromDocument(id!, tag.id)
+        .then(reload)
+        .catch((e) => Alert.alert("Failed", e instanceof Error ? e.message : String(e)));
+    },
+    [id, reload],
+  );
 
   const withFile = useCallback(
     async (label: string, action: (uri: string, mime: string) => Promise<void>) => {
@@ -114,16 +161,46 @@ export default function DocumentScreen() {
         <KeyValue label="Id" value={doc.id ?? ""} />
       </Card>
 
-      {tags.length > 0 && (
-        <Card>
-          <Muted>Tags</Muted>
-          <View style={{ flexDirection: "row", flexWrap: "wrap", marginTop: 8 }}>
-            {tags.map((t) => (
-              <TagChip key={t.id} name={t.name} color={t.color} />
-            ))}
-          </View>
-        </Card>
-      )}
+      <Card>
+        <Muted>Tags</Muted>
+        <View style={{ flexDirection: "row", flexWrap: "wrap", marginTop: 8, alignItems: "center" }}>
+          {tags.map((t) => (
+            <TagChip key={t.id} name={t.name} color={t.color} onClose={() => removeTag(t)} />
+          ))}
+          <Chip icon="plus" compact mode="outlined" onPress={openTagPicker} style={{ marginRight: 6, marginBottom: 6 }}>
+            Add tag
+          </Chip>
+        </View>
+      </Card>
+
+      <Portal>
+        <Dialog visible={tagPicker !== null} onDismiss={() => setTagPicker(null)}>
+          <Dialog.Title>Add tag</Dialog.Title>
+          <Dialog.Content>
+            {tagPicker?.length ? (
+              <View style={{ flexDirection: "row", flexWrap: "wrap" }}>
+                {tagPicker.map((t) => (
+                  <Chip
+                    key={t.id}
+                    compact
+                    mode="outlined"
+                    onPress={() => addTag(t)}
+                    style={{ marginRight: 6, marginBottom: 6, borderColor: t.color }}
+                    textStyle={{ color: t.color }}
+                  >
+                    {t.name}
+                  </Chip>
+                ))}
+              </View>
+            ) : (
+              <Muted>Every tag is already on this document. Create tags from the Tags page.</Muted>
+            )}
+          </Dialog.Content>
+          <Dialog.Actions>
+            <PaperButton onPress={() => setTagPicker(null)}>Close</PaperButton>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
 
       {customProperties != null && Object.keys(customProperties as object).length > 0 && (
         <Card>

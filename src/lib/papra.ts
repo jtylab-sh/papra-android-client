@@ -157,6 +157,40 @@ export async function listTags(): Promise<PapraTag[]> {
   return json.tags ?? [];
 }
 
+export async function createTag(input: { name: string; color: string; description?: string }): Promise<PapraTag> {
+  const s = await getSettings();
+  const json = await papraRequest<{ tag: PapraTag }>(orgPath(s, "/tags"), { method: "POST", body: input, settings: s });
+  return json.tag;
+}
+
+export async function updateTag(
+  tagId: string,
+  patch: { name?: string; color?: string; description?: string },
+): Promise<PapraTag> {
+  const s = await getSettings();
+  const json = await papraRequest<{ tag: PapraTag }>(orgPath(s, `/tags/${tagId}`), {
+    method: "PUT",
+    body: patch,
+    settings: s,
+  });
+  return json.tag;
+}
+
+export async function deleteTag(tagId: string): Promise<void> {
+  const s = await getSettings();
+  await papraRequest(orgPath(s, `/tags/${tagId}`), { method: "DELETE", settings: s });
+}
+
+export async function addTagToDocument(documentId: string, tagId: string): Promise<void> {
+  const s = await getSettings();
+  await papraRequest(orgPath(s, `/documents/${documentId}/tags`), { method: "POST", body: { tagId }, settings: s });
+}
+
+export async function removeTagFromDocument(documentId: string, tagId: string): Promise<void> {
+  const s = await getSettings();
+  await papraRequest(orgPath(s, `/documents/${documentId}/tags/${tagId}`), { method: "DELETE", settings: s });
+}
+
 /** Upload a local file. RN FormData takes {uri, name, type}. */
 export async function uploadDocument(file: { uri: string; name: string; mimeType?: string }): Promise<PapraDocument> {
   const s = await getSettings();
