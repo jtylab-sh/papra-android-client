@@ -58,7 +58,7 @@ async function post(channelId: "sync" | "alerts", title: string, body: string, u
 export async function notifyNewDocuments(count: number, firstName: string): Promise<void> {
   if (!(await getSettings()).notifyNewDocuments) return;
   const title = count === 1 ? "1 new document" : `${count} new documents`;
-  await post("sync", title, count === 1 ? firstName : `${firstName}, …`, "/");
+  await post("sync", title, count === 1 ? firstName : `${firstName}, …`, "/documents");
 }
 
 export async function notifySyncFailures(streak: number): Promise<void> {
@@ -104,12 +104,15 @@ export function wireNotificationNavigation(navigate: (url: string) => void): () 
     })
     .catch(() => {});
   const unsubNotifee = notifee.onForegroundEvent(({ type, detail }) => {
-    if (type === EventType.PRESS && detail.pressAction?.id === SYNC_PROGRESS_ID) navigate("/settings");
+    if (type !== EventType.PRESS) return;
+    if (detail.pressAction?.id === SYNC_PROGRESS_ID) navigate("/settings");
+    if (detail.pressAction?.id === UPLOAD_PROGRESS_ID) navigate("/queue");
   });
   notifee
     .getInitialNotification()
     .then((initial) => {
       if (initial?.pressAction?.id === SYNC_PROGRESS_ID) navigate("/settings");
+      if (initial?.pressAction?.id === UPLOAD_PROGRESS_ID) navigate("/queue");
     })
     .catch(() => {});
   return () => {
@@ -176,4 +179,45 @@ export async function clearSyncNotification(): Promise<void> {
 export async function stopSyncService(): Promise<void> {
   await notifee.stopForegroundService();
   await notifee.cancelNotification(SYNC_PROGRESS_ID).catch(() => {});
+}
+
+/**
+ * Upload progress: same foreground-service pattern as sync so an upload keeps
+ * running when the user switches apps. Taps lead to the queue page.
+ */
+const UPLOAD_PROGRESS_ID = "upload-progress";
+const UPLOAD_FGS_ANDROID = {
+  channelId: UPLOAD_PROGRESS_ID,
+  asForegroundService: true,
+  foregroundServiceTypes: [AndroidForegroundServiceType.FOREGROUND_SERVICE_TYPE_DATA_SYNC],
+  ongoing: true,
+  onlyAlertOnce: true,
+  pressAction: { id: UPLOAD_PROGRESS_ID, launchActivity: "default" },
+};
+
+/** asService=false for background runs (Android 12+ forbids starting one there). */
+export async function updateUploadProgress(done: number, total: number, name: string, asService = true): Promise<void> {
+  try {
+    await notifee.createChannel({
+      id: UPLOAD_PROGRESS_ID,
+      name: "Upload progress",
+      importance: AndroidImportance.LOW,
+    });
+    const { asForegroundService, foregroundServiceTypes, ...plain } = UPLOAD_FGS_ANDROID;
+    await notifee.displayNotification({
+      id: UPLOAD_PROGRESS_ID,
+      title: `Uploading ${Math.min(done + 1, total)} of ${total}`,
+      body: name,
+      android: { ...(asService ? UPLOAD_FGS_ANDROID : plain), progress: { max: total, current: done } },
+    });
+  } catch {
+    /* notifications must never break an upload */
+  }
+}
+
+export async function stopUploadNotification(): Promise<void> {
+  // ponytail: stopForegroundService stops the one shared service; a manual
+  // sync running at the same moment degrades to a plain notification.
+  await notifee.stopForegroundService().catch(() => {});
+  await notifee.cancelNotification(UPLOAD_PROGRESS_ID).catch(() => {});
 }

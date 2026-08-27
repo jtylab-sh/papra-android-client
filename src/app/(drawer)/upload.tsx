@@ -1,13 +1,11 @@
-import { Stack, router, useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { FlatList, View } from "react-native";
 import { Button as PaperButton, Dialog, IconButton, Portal, Text, useTheme } from "react-native-paper";
 import { Button, Card, Input, Muted, Row } from "~/components/ui";
 import { spacing, type AppTheme } from "~/constants/theme";
-import { isOfflineError, uploadDocument } from "~/lib/papra";
-import { enqueueUpload } from "~/lib/uploads";
+import { enqueueUpload, flushUploads, removeQueuedUpload } from "~/lib/uploads";
 import { pickFiles, scanDocuments } from "~/lib/pickers";
-import { syncMetadata } from "~/lib/sync";
 
 interface PendingFile {
   uri: string;
@@ -15,6 +13,8 @@ interface PendingFile {
   mimeType?: string;
   status: "pending" | "uploading" | "done" | "failed" | "queued";
   error?: string;
+  /** Queue entry backing this row once the upload has started. */
+  key?: string;
 }
 
 export default function UploadScreen() {
@@ -23,6 +23,12 @@ export default function UploadScreen() {
   const [files, setFiles] = useState<PendingFile[]>([]);
   const [busy, setBusy] = useState(false);
   const [rename, setRename] = useState<{ index: number; text: string } | null>(null);
+
+  // Deep links (widget, quick action) can land here with no history.
+  const leave = useCallback(() => {
+    if (router.canGoBack()) router.back();
+    else router.navigate("/");
+  }, []);
 
   const saveRename = useCallback(() => {
     if (!rename) return;
@@ -73,12 +79,12 @@ export default function UploadScreen() {
       // Deep-link launch (Scan widget): open the scanner straight away, and
       // if the user cancels there, leave — never strand them on an empty page.
       scan().then((got) => {
-        if (!got) router.back();
+        if (!got) leave();
       });
     } else if (params.mode === "pick") {
       // Launcher shortcut: straight into the file picker.
       pick().then((got) => {
-        if (!got) router.back();
+        if (!got) leave();
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -86,29 +92,53 @@ export default function UploadScreen() {
 
   const upload = useCallback(async () => {
     setBusy(true);
-    for (let i = 0; i < files.length; i++) {
-      if (files[i].status === "done" || files[i].status === "queued") continue;
-      setFiles((prev) => prev.map((f, j) => (j === i ? { ...f, status: "uploading" } : f)));
+    // Every file goes through the on-disk queue first: the upload survives
+    // app switches and kills (foreground flushes and the background task
+    // drain the queue), and one notification shows batch progress.
+    let staged = files;
+    for (let i = 0; i < staged.length; i++) {
+      const f = staged[i];
+      if (f.status === "done" || f.key) continue;
       try {
-        await uploadDocument(files[i]);
-        setFiles((prev) => prev.map((f, j) => (j === i ? { ...f, status: "done" } : f)));
+        const key = await enqueueUpload(f);
+        staged = staged.map((x, j) => (j === i ? { ...x, key, status: "uploading" as const, error: undefined } : x));
       } catch (e) {
-        if (isOfflineError(e)) {
-          // Genuinely offline: park the file in the queue, it uploads on
-          // reconnect. Any other failure shows its real cause on the row.
-          await enqueueUpload(files[i]).catch(() => {});
-          setFiles((prev) => prev.map((f, j) => (j === i ? { ...f, status: "queued" } : f)));
-          continue;
-        }
-        setFiles((prev) =>
-          prev.map((f, j) =>
-            j === i ? { ...f, status: "failed", error: e instanceof Error ? e.message : String(e) } : f,
-          ),
+        staged = staged.map((x, j) =>
+          j === i ? { ...x, status: "failed" as const, error: e instanceof Error ? e.message : String(e) } : x,
         );
       }
     }
+    setFiles(staged);
+    const result = await flushUploads();
+    const sentKeys = new Set(result?.sentKeys ?? []);
+    const dropped = new Map((result?.droppedKeys ?? []).map((d) => [d.key, d.message]));
+    setFiles((prev) =>
+      prev.map((f) => {
+        if (!f.key || f.status === "done") return f;
+        if (sentKeys.has(f.key)) return { ...f, status: "done", error: undefined };
+        // Dropped = the server refused it (4xx); its queue file is gone, so
+        // clearing the key lets a retry re-enqueue the source file.
+        if (dropped.has(f.key)) return { ...f, status: "failed", key: undefined, error: dropped.get(f.key) };
+        return { ...f, status: "queued", error: result?.failedError ?? undefined };
+      }),
+    );
     setBusy(false);
-    syncMetadata().catch(() => {});
+  }, [files]);
+
+  const removeFile = useCallback(
+    (index: number) => {
+      const f = files[index];
+      if (f?.key && f.status !== "done") removeQueuedUpload(f.key).catch(() => {});
+      setFiles((prev) => prev.filter((_, j) => j !== index));
+    },
+    [files],
+  );
+
+  const clearAll = useCallback(() => {
+    for (const f of files) {
+      if (f.key && f.status !== "done") removeQueuedUpload(f.key).catch(() => {});
+    }
+    setFiles([]);
   }, [files]);
 
   const allDone = files.length > 0 && files.every((f) => f.status === "done" || f.status === "queued");
@@ -122,7 +152,6 @@ export default function UploadScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.background, padding: spacing.md }}>
-      <Stack.Screen options={{ title: "Upload" }} />
       <Row style={{ marginBottom: spacing.md }}>
         <View style={{ flex: 1 }}>
           <Button label="Pick files" kind="ghost" onPress={pick} />
@@ -149,14 +178,27 @@ export default function UploadScreen() {
                   onPress={() => setRename({ index, text: item.name })}
                 />
               ) : null}
+              {item.status !== "uploading" ? (
+                <IconButton
+                  icon="close"
+                  size={16}
+                  accessibilityLabel={`Remove ${item.name}`}
+                  onPress={() => removeFile(index)}
+                />
+              ) : null}
             </Row>
             <Text variant="bodySmall" style={{ color: statusColor[item.status], marginTop: 2 }}>
-              {item.status === "queued" ? "queued - uploads when back online" : item.status}
+              {item.status === "queued" ? "queued - retries automatically" : item.status}
               {item.error ? ` - ${item.error}` : ""}
             </Text>
           </Card>
         )}
       />
+      {files.length > 1 && !busy ? (
+        <View style={{ marginBottom: spacing.sm }}>
+          <Button label="Clear list" kind="ghost" onPress={clearAll} />
+        </View>
+      ) : null}
       <Portal>
         <Dialog visible={rename !== null} onDismiss={() => setRename(null)}>
           <Dialog.Title>Document name</Dialog.Title>
@@ -172,9 +214,14 @@ export default function UploadScreen() {
         </Dialog>
       </Portal>
       {allDone ? (
-        <Button label="Done" onPress={() => router.back()} />
+        <Button label="Done" onPress={() => router.navigate("/documents")} />
       ) : (
-        <Button label={`Upload ${files.filter((f) => f.status !== "done" && f.status !== "queued").length} file(s)`} onPress={upload} loading={busy} disabled={files.length === 0} />
+        <Button
+          label={`Upload ${files.filter((f) => f.status !== "done" && f.status !== "queued").length} file(s)`}
+          onPress={upload}
+          loading={busy}
+          disabled={files.length === 0 || busy}
+        />
       )}
     </View>
   );

@@ -38,6 +38,7 @@ import { useOnReconnect } from "~/lib/network";
 import { getSettings, useDateFormat, type DateFormat } from "~/lib/settings";
 import { isPrintCancel, printDocument } from "~/lib/print";
 import { ensureLocalFile, localFileNamedForUser, removeLocalCopy } from "~/lib/sync";
+import { removeCachedDocument } from "~/lib/db";
 
 export default function DocumentScreen() {
   const theme = useTheme<AppTheme>();
@@ -273,6 +274,7 @@ export default function DocumentScreen() {
           onPress: async () => {
             try {
               await trashDocument(id!);
+              removeCachedDocument(id!);
               router.back();
             } catch (e) {
               Alert.alert("Failed", e instanceof Error ? e.message : String(e));
@@ -366,15 +368,13 @@ export default function DocumentScreen() {
               onClose={() => removeTag(t)}
               onPress={() =>
                 router.push({
-                  pathname: "/",
+                  pathname: "/documents",
                   params: { q: /\s/.test(t.name) ? `tag:"${t.name}"` : `tag:${t.name}` },
                 })
               }
             />
           ))}
-          <Chip icon="plus" compact mode="outlined" onPress={openTagPicker} style={{ marginRight: 6, marginBottom: 6 }}>
-            Add tag
-          </Chip>
+          <TagChip name="+ Add tag" onPress={openTagPicker} />
         </View>
       </Card>
 

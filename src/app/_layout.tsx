@@ -48,7 +48,7 @@ export default function RootLayout() {
     QuickActions.setItems<RouterAction>([
       { id: "scan", title: "Scan", params: { href: "/upload?mode=scan" } },
       { id: "upload", title: "Upload", params: { href: "/upload?mode=pick" } },
-      { id: "search", title: "Search", params: { href: "/" } },
+      { id: "search", title: "Search", params: { href: "/documents" } },
     ]).catch(() => {});
   }, []);
 

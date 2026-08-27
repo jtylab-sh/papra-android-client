@@ -6,7 +6,7 @@ import { Button, Input, Muted, Title } from "~/components/ui";
 import { spacing, type AppTheme } from "~/constants/theme";
 import { getAuthClient } from "~/lib/auth";
 import { listOrganizations, type PapraOrganization } from "~/lib/papra";
-import { getSettings, DEFAULTS, normalizeServerUrl, saveSettings, type Settings } from "~/lib/settings";
+import { getSettings, normalizeServerUrl, saveSettings, type Settings } from "~/lib/settings";
 import { applySyncRegistration } from "~/lib/sync";
 
 type Step = "credentials" | "totp" | "org";
@@ -72,7 +72,9 @@ export default function SignInScreen() {
         setStep("totp");
         return;
       }
-      await pickOrgsOrFinish({ ...DEFAULTS, serverUrl: url, accountEmail: email.trim() });
+      // Merge over the stored settings: a re-login must never reset device
+      // preferences (sync, biometric lock, notifications, date format).
+      await pickOrgsOrFinish({ ...(await getSettings()), serverUrl: url, accountEmail: email.trim() });
     });
 
   const verifyTotp = () =>
@@ -81,7 +83,7 @@ export default function SignInScreen() {
       const client = getAuthClient(url);
       const { error: totpError } = await client.twoFactor.verifyTotp({ code: code.trim(), trustDevice });
       if (totpError) throw new Error(totpError.message ?? "Invalid code");
-      await pickOrgsOrFinish({ ...DEFAULTS, serverUrl: url, accountEmail: email.trim() });
+      await pickOrgsOrFinish({ ...(await getSettings()), serverUrl: url, accountEmail: email.trim() });
     });
 
   if (step === "org") {

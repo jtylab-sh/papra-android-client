@@ -44,7 +44,7 @@ export default function DrawerLayout() {
   const theme = useTheme<AppTheme>();
   return (
     <Drawer
-      initialRouteName="home"
+      initialRouteName="index"
       screenOptions={{
         headerStyle: { backgroundColor: theme.colors.surface },
         headerTintColor: theme.colors.onSurface,
@@ -57,15 +57,6 @@ export default function DrawerLayout() {
       drawerContent={(props: DrawerContentComponentProps) => (
         <DrawerContentScrollView {...props} contentContainerStyle={{ flexGrow: 1 }}>
           <DrawerItemList {...props} />
-          <DrawerItem
-            label="Upload"
-            icon={drawerIcon("tray-arrow-up")}
-            onPress={() => {
-              props.navigation.closeDrawer();
-              router.push("/upload");
-            }}
-            inactiveTintColor={theme.colors.onSurfaceVariant}
-          />
           <DrawerItem
             label="Open in browser"
             icon={drawerIcon("open-in-new")}
@@ -86,15 +77,19 @@ export default function DrawerLayout() {
       )}
     >
       <Drawer.Screen
-        name="home"
+        name="index"
         options={{ title: "Home", drawerIcon: drawerIcon("home-outline") }}
       />
       <Drawer.Screen
-        name="index"
+        name="documents"
         options={{
           title: "Documents",
           drawerIcon: drawerIcon("file-document-multiple-outline"),
         }}
+      />
+      <Drawer.Screen
+        name="upload"
+        options={{ title: "Upload", drawerIcon: drawerIcon("tray-arrow-up") }}
       />
       <Drawer.Screen
         name="offline"

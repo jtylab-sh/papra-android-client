@@ -164,6 +164,11 @@ export function countCachedDocuments(search = "", synced?: boolean): number {
   return row?.n ?? 0;
 }
 
+/** Drop one row immediately (trash/delete): the UI must not wait for a sync. */
+export function removeCachedDocument(id: string): void {
+  getDb().runSync("delete from documents where id = ?", [id]);
+}
+
 export function getCachedDocument(id: string): CachedDocument | null {
   const row = getDb().getFirstSync("select * from documents where id = ?", [id]);
   return row ? toCached(row as Record<string, unknown>) : null;

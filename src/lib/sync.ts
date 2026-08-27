@@ -32,6 +32,7 @@ import {
 import { authStorageKeys, getAuthClient } from "~/lib/auth";
 import { getSettings, isConnected, saveSettings, type Settings } from "~/lib/settings";
 import { updateRecentDocumentsWidget } from "~/widgets/widgets";
+import { flushUploads } from "~/lib/uploads";
 import {
   clearSyncNotification,
   notifyNewDocuments,
@@ -407,6 +408,8 @@ async function checkTrashPurge(retentionDays: number): Promise<void> {
 // Must be defined at module scope so the background task can run headlessly.
 TaskManager.defineTask(SYNC_TASK, async () => {
   try {
+    // Files queued while the app was gone go out even without a UI session.
+    await flushUploads().catch(() => {});
     const s = await getSettings();
     if (!s.syncEnabled) return BackgroundTask.BackgroundTaskResult.Success;
     await syncNow({ respectWifiOnly: true, background: true });
