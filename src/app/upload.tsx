@@ -1,12 +1,11 @@
-import * as DocumentPicker from "expo-document-picker";
 import { Stack, router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { FlatList, View } from "react-native";
-import DocumentScanner from "react-native-document-scanner-plugin";
 import { Text, useTheme } from "react-native-paper";
 import { Button, Card, Muted, Row } from "../components/ui";
 import { spacing, type AppTheme } from "../constants/theme";
 import { uploadDocument } from "../lib/papra";
+import { pickFiles, scanDocuments } from "../lib/pickers";
 import { syncMetadata } from "../lib/sync";
 
 interface PendingFile {
@@ -23,33 +22,18 @@ export default function UploadScreen() {
   const [files, setFiles] = useState<PendingFile[]>([]);
   const [busy, setBusy] = useState(false);
 
-  const pick = useCallback(async () => {
-    const result = await DocumentPicker.getDocumentAsync({ multiple: true, copyToCacheDirectory: true });
-    if (result.canceled) return;
-    setFiles((prev) => [
-      ...prev,
-      ...result.assets.map((a) => ({
-        uri: a.uri,
-        name: a.name,
-        mimeType: a.mimeType,
-        status: "pending" as const,
-      })),
-    ]);
+  const pick = useCallback(async (): Promise<boolean> => {
+    const picked = await pickFiles();
+    if (!picked.length) return false;
+    setFiles((prev) => [...prev, ...picked.map((f) => ({ ...f, status: "pending" as const }))]);
+    return true;
   }, []);
 
-  const scan = useCallback(async () => {
-    const { scannedImages, status } = await DocumentScanner.scanDocument();
-    if (status !== "success" || !scannedImages?.length) return;
-    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-    setFiles((prev) => [
-      ...prev,
-      ...scannedImages.map((uri, i) => ({
-        uri: uri.startsWith("file://") ? uri : `file://${uri}`,
-        name: `scan-${stamp}${scannedImages.length > 1 ? `-${i + 1}` : ""}.jpg`,
-        mimeType: "image/jpeg",
-        status: "pending" as const,
-      })),
-    ]);
+  const scan = useCallback(async (): Promise<boolean> => {
+    const picked = await scanDocuments();
+    if (!picked.length) return false;
+    setFiles((prev) => [...prev, ...picked.map((f) => ({ ...f, status: "pending" as const }))]);
+    return true;
   }, []);
 
   useEffect(() => {
@@ -67,10 +51,12 @@ export default function UploadScreen() {
       } catch {
         /* malformed share payload — user can still pick manually */
       }
-    } else if (params.mode === "pick") {
-      pick();
-    } else if (params.mode === "scan") {
-      scan();
+    } else if (params.mode === "pick" || params.mode === "scan") {
+      // Deep-link launch (Scan widget): open the native UI straight away, and
+      // if the user cancels there, leave — never strand them on an empty page.
+      (params.mode === "pick" ? pick() : scan()).then((got) => {
+        if (!got) router.back();
+      });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

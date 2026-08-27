@@ -26,6 +26,7 @@ import {
   listDocuments,
   type PapraDocumentView,
 } from "../../lib/papra";
+import { pickFiles, scanDocuments } from "../../lib/pickers";
 import { getSettings, isConnected } from "../../lib/settings";
 import { syncMetadata, upsertFromSearch } from "../../lib/screens-helpers";
 import { ensureLocalFile } from "../../lib/sync";
@@ -331,12 +332,20 @@ export default function DocumentsScreen() {
             {
               icon: "line-scan",
               label: "Scan",
-              onPress: () => router.push({ pathname: "/upload", params: { mode: "scan" } }),
+              // Native UI first; the upload page only opens with results, so
+              // cancelling never leaves an empty page in the back stack.
+              onPress: async () => {
+                const files = await scanDocuments();
+                if (files.length) router.push({ pathname: "/upload", params: { files: JSON.stringify(files) } });
+              },
             },
             {
               icon: "file-upload-outline",
               label: "Upload",
-              onPress: () => router.push({ pathname: "/upload", params: { mode: "pick" } }),
+              onPress: async () => {
+                const files = await pickFiles();
+                if (files.length) router.push({ pathname: "/upload", params: { files: JSON.stringify(files) } });
+              },
             },
           ]}
           onStateChange={({ open }) => setFabOpen(open)}
