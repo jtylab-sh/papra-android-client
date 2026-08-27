@@ -38,6 +38,8 @@ project.
   Wi-Fi-only option) using Android WorkManager; an Offline tab lists what's on the phone, offline
   documents are marked with a cloud icon, and copies can additionally be exported to a folder you
   pick (visible in your file manager).
+- **Organizations**: switch between your Papra organizations or create a new one from Settings
+  (switching clears and re-syncs the offline mirror).
 - **Home-screen widgets**: a *Scan to Papra* button that jumps straight into the scanner, and a
   *Recent documents* list fed from the offline mirror (refreshed after every sync; rows open the
   document).

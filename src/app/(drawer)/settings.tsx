@@ -3,13 +3,24 @@ import * as LocalAuthentication from "expo-local-authentication";
 import { router } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { Alert, ScrollView, View } from "react-native";
-import { Chip, Switch, Text, useTheme } from "react-native-paper";
+import {
+  Button as PaperButton,
+  Chip,
+  Dialog,
+  Portal,
+  RadioButton,
+  Switch,
+  Text,
+  TextInput,
+  useTheme,
+} from "react-native-paper";
 import { Button, Card, KeyValue, Muted, Row } from "../../components/ui";
 import { spacing, type AppTheme } from "../../constants/theme";
 import { getAuthClient } from "../../lib/auth";
+import { createOrganization, listOrganizations, type PapraOrganization } from "../../lib/papra";
 import { getMeta } from "../../lib/db";
 import { clearSettings, getSettings, saveSettings, type Settings } from "../../lib/settings";
-import { applySyncRegistration, syncNow, wipeLocalData } from "../../lib/sync";
+import { applySyncRegistration, syncMetadata, syncNow, wipeLocalData } from "../../lib/sync";
 
 const GRACE: { label: string; minutes: number }[] = [
   { label: "Immediately", minutes: 0 },
@@ -60,6 +71,60 @@ export default function SettingsScreen() {
     },
     [update],
   );
+
+  // --- organizations (switch / create, like Papra's org picker) ---
+  const [orgDialog, setOrgDialog] = useState(false);
+  const [orgs, setOrgs] = useState<PapraOrganization[]>([]);
+  const [newOrgName, setNewOrgName] = useState("");
+  const [orgBusy, setOrgBusy] = useState(false);
+
+  const openOrgDialog = useCallback(async () => {
+    try {
+      setOrgs(await listOrganizations());
+      setOrgDialog(true);
+    } catch (e) {
+      Alert.alert("Failed", e instanceof Error ? e.message : String(e));
+    }
+  }, []);
+
+  const switchOrg = useCallback(
+    (org: PapraOrganization) => {
+      if (org.id === settings?.organizationId) return;
+      Alert.alert(
+        "Switch organization?",
+        `The offline mirror on this phone is cleared and re-synced for "${org.name}".`,
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Switch",
+            onPress: async () => {
+              setOrgDialog(false);
+              wipeLocalData();
+              const next = await saveSettings({ organizationId: org.id, organizationName: org.name });
+              setSettings(next);
+              syncMetadata().catch(() => {});
+            },
+          },
+        ],
+      );
+    },
+    [settings?.organizationId],
+  );
+
+  const createOrg = useCallback(async () => {
+    const name = newOrgName.trim();
+    if (!name) return;
+    setOrgBusy(true);
+    try {
+      const org = await createOrganization(name);
+      setNewOrgName("");
+      setOrgs(await listOrganizations().catch(() => [...orgs, org]));
+    } catch (e) {
+      Alert.alert("Failed", e instanceof Error ? e.message : String(e));
+    } finally {
+      setOrgBusy(false);
+    }
+  }, [newOrgName, orgs]);
 
   const runSync = useCallback(async () => {
     setSyncing(true);
@@ -117,7 +182,45 @@ export default function SettingsScreen() {
           <KeyValue label="Organization" value={settings.organizationName || settings.organizationId} />
           <KeyValue label="Auth" value={settings.authMode === "apiKey" ? "API key" : "Email & password"} />
         </View>
+        <View style={{ marginTop: spacing.sm }}>
+          <Button label="Manage organizations" kind="ghost" onPress={openOrgDialog} />
+        </View>
       </Card>
+
+      <Portal>
+        <Dialog visible={orgDialog} onDismiss={() => setOrgDialog(false)}>
+          <Dialog.Title>Organizations</Dialog.Title>
+          <Dialog.Content>
+            <RadioButton.Group value={settings.organizationId} onValueChange={() => {}}>
+              {orgs.map((org) => (
+                <RadioButton.Item
+                  key={org.id}
+                  label={org.name}
+                  value={org.id}
+                  onPress={() => switchOrg(org)}
+                />
+              ))}
+            </RadioButton.Group>
+            <Row style={{ marginTop: spacing.sm }}>
+              <View style={{ flex: 1 }}>
+                <TextInput
+                  mode="outlined"
+                  dense
+                  label="New organization"
+                  value={newOrgName}
+                  onChangeText={setNewOrgName}
+                />
+              </View>
+              <PaperButton mode="contained" loading={orgBusy} disabled={!newOrgName.trim()} onPress={createOrg}>
+                Create
+              </PaperButton>
+            </Row>
+          </Dialog.Content>
+          <Dialog.Actions>
+            <PaperButton onPress={() => setOrgDialog(false)}>Close</PaperButton>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
 
       <Card>
         <Row style={{ justifyContent: "space-between" }}>

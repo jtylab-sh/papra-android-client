@@ -119,6 +119,15 @@ export async function listOrganizations(settings?: Settings): Promise<PapraOrgan
   return json.organizations ?? [];
 }
 
+export async function createOrganization(name: string, settings?: Settings): Promise<PapraOrganization> {
+  const json = await papraRequest<{ organization: PapraOrganization }>("/api/organizations", {
+    method: "POST",
+    body: { name },
+    settings,
+  });
+  return json.organization;
+}
+
 export interface DocumentPage {
   documents: PapraDocument[];
   documentsCount: number;
