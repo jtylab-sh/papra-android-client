@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Alert, FlatList, RefreshControl, View } from "react-native";
 import { Text, useTheme } from "react-native-paper";
 import { Button, Card, Muted, Row, formatDate } from "~/components/ui";
+import { useDateFormat } from "~/lib/settings";
 import { spacing, type AppTheme } from "~/constants/theme";
 import {
   deleteDocumentForever,
@@ -22,6 +23,7 @@ function retentionSuffix(deletedAt: string | null | undefined, retentionDays: nu
 }
 
 export default function TrashScreen() {
+  const dateFormat = useDateFormat();
   const theme = useTheme<AppTheme>();
   const [docs, setDocs] = useState<PapraDocument[]>([]);
   const [refreshing, setRefreshing] = useState(false);
@@ -116,7 +118,7 @@ export default function TrashScreen() {
               {item.name}
             </Text>
             <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant, marginVertical: 6 }}>
-              deleted {formatDate(item.deletedAt ?? "")}
+              deleted {formatDate(item.deletedAt ?? "", dateFormat)}
               {retentionSuffix(item.deletedAt, retentionDays)}
             </Text>
             <Row>

@@ -9,6 +9,7 @@ import { Text, TouchableRipple, useTheme } from "react-native-paper";
 import { spacing, type AppTheme } from "~/constants/theme";
 import type { CachedDocument } from "~/lib/db";
 import { formatBytes, formatDate } from "~/components/ui";
+import { useDateFormat } from "~/lib/settings";
 
 type IconName = keyof typeof MaterialCommunityIcons.glyphMap;
 type Tone = "primary" | "secondary" | "tertiary";
@@ -62,6 +63,7 @@ export function DocumentRow({
   onLongPress?: () => void;
 }) {
   const theme = useTheme<AppTheme>();
+  const dateFormat = useDateFormat();
   return (
     <TouchableRipple
       onPress={onPress}
@@ -87,7 +89,7 @@ export function DocumentRow({
             {doc.name}
           </Text>
           <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant, marginTop: 2 }}>
-            {formatDate(doc.createdAt)}
+            {formatDate(doc.createdAt, dateFormat)}
             {doc.originalSize ? ` · ${formatBytes(doc.originalSize)}` : ""}
           </Text>
           {doc.tags.length > 0 ? (

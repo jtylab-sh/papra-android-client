@@ -35,12 +35,13 @@ import {
   type PapraTag,
 } from "~/lib/papra";
 import { useOnReconnect } from "~/lib/network";
-import { getSettings } from "~/lib/settings";
+import { getSettings, useDateFormat, type DateFormat } from "~/lib/settings";
 import { isPrintCancel, printDocument } from "~/lib/print";
 import { ensureLocalFile, localFileNamedForUser, removeLocalCopy } from "~/lib/sync";
 
 export default function DocumentScreen() {
   const theme = useTheme<AppTheme>();
+  const dateFormat = useDateFormat();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [cached, setCached] = useState<CachedDocument | null>(null);
   const [live, setLive] = useState<PapraDocument | null>(null);
@@ -330,7 +331,7 @@ export default function DocumentScreen() {
           <IconButton icon="pencil-outline" size={18} onPress={() => setRenameValue(doc.name ?? "")} />
         </Row>
         <Muted>
-          {formatDate((doc.createdAt as string) ?? "")}
+          {formatDate((doc.createdAt as string) ?? "", dateFormat)}
           {doc.originalSize ? ` \u00b7 ${formatBytes(doc.originalSize as number)}` : ""}
         </Muted>
         <Row style={{ justifyContent: "center", gap: spacing.lg }}>
@@ -469,7 +470,7 @@ export default function DocumentScreen() {
               <Pressable key={prop.key} onPress={() => openPropertyEditor(prop)}>
                 <KeyValue
                   label={prop.name || prop.key}
-                  value={prop.value == null || prop.value === "" ? "Not set" : formatPropertyValue(prop)}
+                  value={prop.value == null || prop.value === "" ? "Not set" : formatPropertyValue(prop, dateFormat)}
                 />
               </Pressable>
             ))}
@@ -510,8 +511,8 @@ export default function DocumentScreen() {
             <KeyValue label="Original name" value={(doc.originalName as string) ?? ""} />
             <KeyValue label="Type" value={doc.mimeType ?? ""} />
             <KeyValue label="Size" value={formatBytes((doc.originalSize as number) ?? 0)} />
-            <KeyValue label="Created" value={formatDate((doc.createdAt as string) ?? "")} />
-            <KeyValue label="Updated" value={formatDate((doc.updatedAt as string) ?? "")} />
+            <KeyValue label="Created" value={formatDate((doc.createdAt as string) ?? "", dateFormat)} />
+            <KeyValue label="Updated" value={formatDate((doc.updatedAt as string) ?? "", dateFormat)} />
             <KeyValue label="SHA-256" value={(live?.originalSha256Hash as string) ?? cached?.sha256 ?? ""} />
             <KeyValue label="Offline copy" value={cached?.fileUri ? "yes" : "no"} />
             <KeyValue label="Id" value={doc.id ?? ""} />
@@ -523,10 +524,10 @@ export default function DocumentScreen() {
 }
 
 /** Papra-style value rendering per property type — never raw JSON. */
-function formatPropertyValue(prop: PapraCustomProperty): string {
+function formatPropertyValue(prop: PapraCustomProperty, dateFormat: DateFormat): string {
   const { type, value } = prop;
   if (type === "boolean") return value ? "Yes" : "No";
-  if (type === "date") return formatDate(String(value));
+  if (type === "date") return formatDate(String(value), dateFormat);
   if (type === "multi_select" && Array.isArray(value)) return value.map(String).join(", ");
   if (type === "user_relation" && value && typeof value === "object") {
     const u = value as { name?: string; email?: string };

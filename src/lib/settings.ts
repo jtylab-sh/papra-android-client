@@ -1,6 +1,7 @@
 /**
  * App settings, stored in SecureStore (everything is small strings).
  */
+import { useSyncExternalStore } from "react";
 import * as SecureStore from "expo-secure-store";
 import { setActiveOrg } from "~/lib/db";
 
@@ -46,6 +47,23 @@ export type DateFormat = "system" | "dmy" | "mdy" | "ymd";
 // Mirrors the persisted setting so the synchronous date formatter (used in
 // every list row) never needs to await SecureStore.
 let activeDateFormat: DateFormat = "system";
+// React Compiler memoizes by visible deps, so a plain module read goes stale
+// in already-rendered rows — components must subscribe via useDateFormat().
+const dateFormatListeners = new Set<() => void>();
+function setDateFormatMirror(f: DateFormat): void {
+  if (f === activeDateFormat) return;
+  activeDateFormat = f;
+  dateFormatListeners.forEach((l) => l());
+}
+export function useDateFormat(): DateFormat {
+  return useSyncExternalStore(
+    (cb) => {
+      dateFormatListeners.add(cb);
+      return () => dateFormatListeners.delete(cb);
+    },
+    () => activeDateFormat,
+  );
+}
 
 export function getActiveDateFormat(): DateFormat {
   return activeDateFormat;
@@ -83,7 +101,7 @@ export async function getSettings(): Promise<Settings> {
     settings = { ...DEFAULTS };
   }
   setActiveOrg(settings.organizationId);
-  activeDateFormat = settings.dateFormat;
+  setDateFormatMirror(settings.dateFormat);
   return settings;
 }
 
@@ -92,7 +110,7 @@ export async function saveSettings(patch: Partial<Settings>): Promise<Settings> 
   if (next.serverUrl) next.serverUrl = normalizeServerUrl(next.serverUrl);
   await SecureStore.setItemAsync(KEY, JSON.stringify(next));
   setActiveOrg(next.organizationId);
-  activeDateFormat = next.dateFormat;
+  setDateFormatMirror(next.dateFormat);
   return next;
 }
 

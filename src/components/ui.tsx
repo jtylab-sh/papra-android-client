@@ -12,7 +12,7 @@ import {
   type TextInputProps,
 } from "react-native-paper";
 import { radius, spacing, type AppTheme } from "~/constants/theme";
-import { getActiveDateFormat } from "~/lib/settings";
+import { getActiveDateFormat, type DateFormat } from "~/lib/settings";
 
 export function Screen({ children, style }: PropsWithChildren<{ style?: ViewStyle }>) {
   const theme = useTheme<AppTheme>();
@@ -163,8 +163,7 @@ export function formatBytes(n: number): string {
   return `${v.toFixed(v < 10 && i > 0 ? 1 : 0)} ${units[i]}`;
 }
 
-function formatDay(d: Date): string {
-  const format = getActiveDateFormat();
+function formatDay(d: Date, format: DateFormat): string {
   if (format === "system") return d.toLocaleDateString();
   const dd = String(d.getDate()).padStart(2, "0");
   const mm = String(d.getMonth() + 1).padStart(2, "0");
@@ -174,12 +173,12 @@ function formatDay(d: Date): string {
   return `${yyyy}-${mm}-${dd}`;
 }
 
-export function formatDate(iso: string): string {
+export function formatDate(iso: string, format: DateFormat = getActiveDateFormat()): string {
   if (!iso) return "";
   const d = new Date(iso);
   return isNaN(d.getTime())
     ? iso
-    : formatDay(d) + " " + d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    : formatDay(d, format) + " " + d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
 const styles = StyleSheet.create({
