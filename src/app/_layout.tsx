@@ -2,17 +2,19 @@ import * as LocalAuthentication from "expo-local-authentication";
 import { Stack, router } from "expo-router";
 import { useShareIntent } from "expo-share-intent";
 import { StatusBar } from "expo-status-bar";
-import { useCallback, useEffect, useState } from "react";
-import { AppState } from "react-native";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Alert, AppState } from "react-native";
 import { Button, Muted, Screen, Title } from "../components/ui";
 import { colors } from "../constants/theme";
-import { getSettings } from "../lib/settings";
+import { getAuthClient } from "../lib/auth";
+import { clearSettings, getSettings } from "../lib/settings";
 // Side effect: defines the background sync task at module scope.
-import "../lib/sync";
+import { applySyncRegistration, wipeLocalData } from "../lib/sync";
 
 export default function RootLayout() {
   // null = still deciding, true = locked, false = usable
   const [locked, setLocked] = useState<boolean | null>(null);
+  const leftAt = useRef<number | null>(null);
 
   const unlock = useCallback(async () => {
     const result = await LocalAuthentication.authenticateAsync({
@@ -21,21 +23,25 @@ export default function RootLayout() {
     if (result.success) setLocked(false);
   }, []);
 
+  // Auto-open the biometric prompt whenever the lock screen appears.
+  useEffect(() => {
+    if (locked === true) unlock();
+  }, [locked, unlock]);
+
   useEffect(() => {
     let mounted = true;
     getSettings().then((s) => {
       if (!mounted) return;
-      if (s.biometricLock) {
-        setLocked(true);
-        unlock();
-      } else {
-        setLocked(false);
-      }
+      setLocked(s.biometricLock);
     });
     const sub = AppState.addEventListener("change", (state) => {
       if (state === "background") {
+        leftAt.current = Date.now();
+      } else if (state === "active" && leftAt.current !== null) {
+        const awayMs = Date.now() - leftAt.current;
+        leftAt.current = null;
         getSettings().then((s) => {
-          if (s.biometricLock) setLocked(true);
+          if (s.biometricLock && awayMs > s.lockGraceMinutes * 60_000) setLocked(true);
         });
       }
     });
@@ -43,7 +49,30 @@ export default function RootLayout() {
       mounted = false;
       sub.remove();
     };
-  }, [unlock]);
+  }, []);
+
+  const signOut = useCallback(() => {
+    Alert.alert("Sign out?", "Removes the account, settings and every offline document from this phone.", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Sign out",
+        style: "destructive",
+        onPress: async () => {
+          const s = await getSettings();
+          if (s.authMode === "session" && s.serverUrl) {
+            await getAuthClient(s.serverUrl)
+              .signOut()
+              .catch(() => {});
+          }
+          wipeLocalData();
+          await clearSettings();
+          await applySyncRegistration().catch(() => {});
+          setLocked(false);
+          router.replace("/sign-in");
+        },
+      },
+    ]);
+  }, []);
 
   const { hasShareIntent, shareIntent, resetShareIntent } = useShareIntent();
   useEffect(() => {
@@ -64,7 +93,12 @@ export default function RootLayout() {
         <StatusBar style="light" />
         <Title>Papra</Title>
         <Muted>Locked</Muted>
-        {locked === true && <Button label="Unlock" onPress={unlock} />}
+        {locked === true && (
+          <>
+            <Button label="Unlock" onPress={unlock} />
+            <Button label="Sign out" kind="ghost" onPress={signOut} />
+          </>
+        )}
       </Screen>
     );
   }

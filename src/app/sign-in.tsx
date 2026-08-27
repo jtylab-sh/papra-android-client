@@ -20,6 +20,7 @@ function draftSettings(serverUrl: string): Settings {
     syncIntervalMinutes: 720,
     syncWifiOnly: true,
     biometricLock: false,
+    lockGraceMinutes: 5,
   };
 }
 

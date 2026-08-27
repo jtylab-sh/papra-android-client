@@ -17,6 +17,8 @@ export interface Settings {
   syncIntervalMinutes: number;
   syncWifiOnly: boolean;
   biometricLock: boolean;
+  /** minutes the app stays unlocked after leaving it; 0 = lock immediately */
+  lockGraceMinutes: number;
 }
 
 const DEFAULTS: Settings = {
@@ -29,6 +31,7 @@ const DEFAULTS: Settings = {
   syncIntervalMinutes: 720,
   syncWifiOnly: true,
   biometricLock: false,
+  lockGraceMinutes: 5,
 };
 
 const KEY = "papra.settings";

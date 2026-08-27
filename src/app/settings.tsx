@@ -9,6 +9,14 @@ import { getMeta } from "../lib/db";
 import { clearSettings, getSettings, saveSettings, type Settings } from "../lib/settings";
 import { applySyncRegistration, syncNow, wipeLocalData } from "../lib/sync";
 
+const GRACE: { label: string; minutes: number }[] = [
+  { label: "Immediately", minutes: 0 },
+  { label: "1 min", minutes: 1 },
+  { label: "5 min", minutes: 5 },
+  { label: "15 min", minutes: 15 },
+  { label: "1 h", minutes: 60 },
+];
+
 const INTERVALS: { label: string; minutes: number }[] = [
   { label: "15 min", minutes: 15 },
   { label: "1 h", minutes: 60 },
@@ -175,6 +183,35 @@ export default function SettingsScreen() {
           />
         </Row>
         <Muted>Require fingerprint / face unlock when the app opens.</Muted>
+        {settings.biometricLock && (
+          <>
+            <Text style={{ color: colors.textMuted, marginTop: spacing.md, marginBottom: 6, fontSize: 12 }}>
+              LOCK AFTER LEAVING THE APP FOR
+            </Text>
+            <Row style={{ flexWrap: "wrap" }}>
+              {GRACE.map((opt) => {
+                const active = settings.lockGraceMinutes === opt.minutes;
+                return (
+                  <Pressable
+                    key={opt.minutes}
+                    onPress={() => update({ lockGraceMinutes: opt.minutes })}
+                    style={{
+                      backgroundColor: active ? colors.primary : colors.surfaceHigh,
+                      borderRadius: radius.sm,
+                      paddingHorizontal: 12,
+                      paddingVertical: 6,
+                      marginBottom: 6,
+                    }}
+                  >
+                    <Text style={{ color: active ? "#06231a" : colors.text, fontWeight: "600", fontSize: 13 }}>
+                      {opt.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </Row>
+          </>
+        )}
       </Card>
 
       <Button label="Sign out" kind="danger" onPress={signOut} />
