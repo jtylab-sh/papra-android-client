@@ -104,7 +104,7 @@ export default function RootLayout() {
   }, []);
 
   const signOut = useCallback(() => {
-    Alert.alert("Sign out?", "Removes the account, settings and every offline document from this phone.", [
+    Alert.alert("Sign out?", "Removes the account and every offline document from this phone. App settings are kept.", [
       { text: "Cancel", style: "cancel" },
       {
         text: "Sign out",

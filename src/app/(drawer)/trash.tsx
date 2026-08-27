@@ -104,7 +104,7 @@ export default function TrashScreen() {
         keyExtractor={(d) => d.id}
         contentContainerStyle={{ padding: spacing.md }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={load} tintColor={theme.colors.primary} />}
-        ListEmptyComponent={!error ? <Muted>Trash is empty.</Muted> : null}
+        ListEmptyComponent={!error && !refreshing ? <Muted>Trash is empty.</Muted> : null}
         ListHeaderComponent={
           docs.length > 0 ? (
             <View style={{ marginBottom: spacing.md }}>

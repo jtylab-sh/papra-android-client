@@ -29,7 +29,7 @@ import {
   clearFileUris,
 } from "~/lib/db";
 import { getAuthClient } from "~/lib/auth";
-import { clearSettings, getSettings, isConnected, type Settings } from "~/lib/settings";
+import { getSettings, isConnected, saveSettings, type Settings } from "~/lib/settings";
 import { updateRecentDocumentsWidget } from "~/widgets/widgets";
 import {
   clearSyncNotification,
@@ -475,7 +475,9 @@ export async function signOutEverything(): Promise<void> {
       .catch(() => {});
   }
   wipeLocalData();
-  await clearSettings();
+  // Only the account is forgotten — device preferences (sync, biometric lock,
+  // notifications, date format...) survive until the app is uninstalled.
+  await saveSettings({ accountEmail: "", organizationId: "", organizationName: "" });
   await applySyncRegistration().catch(() => {});
 }
 

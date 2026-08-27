@@ -1,12 +1,12 @@
 import { Stack, router } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { KeyboardAvoidingView, ScrollView, View } from "react-native";
 import { Card, Text, useTheme } from "react-native-paper";
 import { Button, Input, Muted, Title } from "~/components/ui";
 import { spacing, type AppTheme } from "~/constants/theme";
 import { getAuthClient } from "~/lib/auth";
 import { listOrganizations, type PapraOrganization } from "~/lib/papra";
-import { DEFAULTS, normalizeServerUrl, saveSettings, type Settings } from "~/lib/settings";
+import { getSettings, DEFAULTS, normalizeServerUrl, saveSettings, type Settings } from "~/lib/settings";
 import { applySyncRegistration } from "~/lib/sync";
 
 type Step = "credentials" | "totp" | "org";
@@ -22,6 +22,13 @@ export default function SignInScreen() {
   const [error, setError] = useState("");
   const [orgs, setOrgs] = useState<PapraOrganization[]>([]);
   const [draft, setDraft] = useState<Settings | null>(null);
+
+  // After a sign-out the server URL is kept — prefill it.
+  useEffect(() => {
+    getSettings().then((s) => {
+      if (s.serverUrl) setServerUrl((v) => v || s.serverUrl);
+    });
+  }, []);
 
   const finish = useCallback(async (settings: Settings, org: PapraOrganization) => {
     await saveSettings({ ...settings, organizationId: org.id, organizationName: org.name });
@@ -132,7 +139,6 @@ export default function SignInScreen() {
           <>
             <Muted>Two-factor authentication — enter the 6-digit code from your authenticator app.</Muted>
             <Input
-              placeholder="123456"
               autoComplete="one-time-code"
               autoCapitalize="none"
               autoCorrect={false}

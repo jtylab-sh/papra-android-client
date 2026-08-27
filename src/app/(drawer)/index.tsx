@@ -5,6 +5,7 @@ import { Alert, BackHandler, FlatList, RefreshControl, ScrollView, View } from "
 import ReanimatedSwipeable, { type SwipeableMethods } from "react-native-gesture-handler/ReanimatedSwipeable";
 import Share from "react-native-share";
 import {
+  ActivityIndicator,
   Button as PaperButton,
   Chip,
   Dialog,
@@ -110,7 +111,10 @@ export default function DocumentsScreen() {
         if (countCachedDocuments() === 0) {
           syncMetadata()
             .then(() => active && loadLocal(search))
-            .catch(() => {});
+            .catch(() => {})
+            .finally(() => active && setBooting(false));
+        } else {
+          setBooting(false);
         }
       });
       return () => {
@@ -206,6 +210,7 @@ export default function DocumentsScreen() {
   }, [serverMode, docs.length, search, total, runServerSearch, notSynced, sortIndex]);
 
   const [fabOpen, setFabOpen] = useState(false);
+  const [booting, setBooting] = useState(true);
 
   const startScan = useCallback(async () => {
     // Native UI first; the upload page only opens with results, so cancelling
@@ -542,6 +547,9 @@ export default function DocumentsScreen() {
         contentContainerStyle={{ padding: spacing.md }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={theme.colors.primary} />}
         ListEmptyComponent={
+          booting ? (
+            <ActivityIndicator style={{ marginTop: spacing.lg }} />
+          ) : (
           <View style={{ gap: spacing.md }}>
             <Muted>No documents yet. Pull to refresh, or add your first one.</Muted>
             <View style={{ flexDirection: "row", gap: spacing.sm }}>
@@ -557,6 +565,7 @@ export default function DocumentsScreen() {
               </View>
             </View>
           </View>
+          )
         }
         onEndReached={loadMore}
         onEndReachedThreshold={0.5}

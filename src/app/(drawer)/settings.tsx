@@ -1,6 +1,5 @@
 import * as FileSystemLegacy from "expo-file-system/legacy";
 import * as LocalAuthentication from "expo-local-authentication";
-import { router } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { Alert, ScrollView, View } from "react-native";
 import {
@@ -25,7 +24,6 @@ import {
   applySyncRegistration,
   ensureNoMedia,
   requestSyncPause,
-  signOutEverything,
   syncMetadata,
   syncNow,
   wipeOfflineFiles,
@@ -240,20 +238,6 @@ export default function SettingsScreen() {
     } catch (e) {
       Alert.alert("Failed", e instanceof Error ? e.message : String(e));
     }
-  }, []);
-
-  const signOut = useCallback(() => {
-    Alert.alert("Sign out?", "Removes the account, settings and every offline document from this phone.", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Sign out",
-        style: "destructive",
-        onPress: async () => {
-          await signOutEverything();
-          router.replace("/sign-in");
-        },
-      },
-    ]);
   }, []);
 
   if (!settings) return <View style={{ flex: 1, backgroundColor: theme.colors.background }} />;
@@ -475,8 +459,6 @@ export default function SettingsScreen() {
           />
         </Row>
       </Card>
-
-      <Button label="Sign out" kind="danger" onPress={signOut} />
 
       <View style={{ alignItems: "center" }}>
         <Muted>Papra Android v{appVersion()}</Muted>

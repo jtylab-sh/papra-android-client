@@ -114,10 +114,6 @@ export async function saveSettings(patch: Partial<Settings>): Promise<Settings> 
   return next;
 }
 
-export async function clearSettings(): Promise<void> {
-  await SecureStore.deleteItemAsync(KEY);
-}
-
 export function normalizeServerUrl(url: string): string {
   let u = url.trim().replace(/\/+$/, "");
   if (u && !/^https?:\/\//i.test(u)) u = `https://${u}`;

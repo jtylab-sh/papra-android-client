@@ -6,9 +6,11 @@ import {
   DrawerItemList,
   type DrawerContentComponentProps,
 } from "expo-router/drawer";
-import { type ColorValue, Linking } from "react-native";
+import { router } from "expo-router";
+import { Alert, type ColorValue, Linking, View } from "react-native";
 import { useTheme } from "react-native-paper";
 import { getSettings } from "~/lib/settings";
+import { signOutEverything } from "~/lib/sync";
 import { type AppTheme } from "~/constants/theme";
 
 type IconName = keyof typeof MaterialCommunityIcons.glyphMap;
@@ -17,6 +19,20 @@ function drawerIcon(name: IconName) {
   return ({ color, size }: { color: ColorValue; size: number }) => (
     <MaterialCommunityIcons name={name} color={color as string} size={size} />
   );
+}
+
+function confirmSignOut() {
+  Alert.alert("Sign out?", "Removes the account and every offline document from this phone. App settings are kept.", [
+    { text: "Cancel", style: "cancel" },
+    {
+      text: "Sign out",
+      style: "destructive",
+      onPress: async () => {
+        await signOutEverything();
+        router.replace("/sign-in");
+      },
+    },
+  ]);
 }
 
 async function openInBrowser() {
@@ -39,13 +55,20 @@ export default function DrawerLayout() {
         drawerInactiveTintColor: theme.colors.onSurfaceVariant,
       }}
       drawerContent={(props: DrawerContentComponentProps) => (
-        <DrawerContentScrollView {...props}>
+        <DrawerContentScrollView {...props} contentContainerStyle={{ flexGrow: 1 }}>
           <DrawerItemList {...props} />
           <DrawerItem
             label="Open in browser"
             icon={drawerIcon("open-in-new")}
             onPress={openInBrowser}
             inactiveTintColor={theme.colors.onSurfaceVariant}
+          />
+          <View style={{ flex: 1 }} />
+          <DrawerItem
+            label="Sign out"
+            icon={({ size }) => <MaterialCommunityIcons name="logout" color={theme.colors.error} size={size} />}
+            labelStyle={{ color: theme.colors.error }}
+            onPress={confirmSignOut}
           />
         </DrawerContentScrollView>
       )}

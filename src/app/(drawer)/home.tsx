@@ -5,7 +5,7 @@
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import { FlatList, Pressable, RefreshControl, View } from "react-native";
-import { Text, useTheme } from "react-native-paper";
+import { ActivityIndicator, Text, useTheme } from "react-native-paper";
 import { DocumentRow } from "~/components/document-row";
 import { Button, Card, Muted, Row, formatBytes } from "~/components/ui";
 import { spacing, type AppTheme } from "~/constants/theme";
@@ -24,6 +24,7 @@ export default function HomeScreen() {
   const [stats, setStats] = useState<PapraOrgStats | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [queued, setQueued] = useState(0);
+  const [booting, setBooting] = useState(true);
 
   const loadLocal = useCallback(() => {
     setRecent(listCachedDocuments("", 20, 0));
@@ -41,6 +42,19 @@ export default function HomeScreen() {
         }
         setReady(true);
         loadLocal();
+        // First run after sign-in: mirror the list before declaring "empty".
+        if (countCachedDocuments() === 0) {
+          syncMetadata()
+            .catch(() => {})
+            .finally(() => {
+              if (active) {
+                loadLocal();
+                setBooting(false);
+              }
+            });
+        } else {
+          setBooting(false);
+        }
         getDocumentsStatistics()
           .then((st) => active && setStats(st))
           .catch(() => {});
@@ -113,7 +127,13 @@ export default function HomeScreen() {
           <Text variant="titleMedium">Recent documents</Text>
         </View>
       }
-      ListEmptyComponent={<Muted>No documents yet. Scan or upload your first one.</Muted>}
+      ListEmptyComponent={
+        booting ? (
+          <ActivityIndicator style={{ marginTop: spacing.lg }} />
+        ) : (
+          <Muted>No documents yet. Scan or upload your first one.</Muted>
+        )
+      }
       renderItem={({ item }) => <DocumentRow doc={item} onPress={() => router.push(`/document/${item.id}`)} />}
     />
   );
