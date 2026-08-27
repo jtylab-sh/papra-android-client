@@ -192,7 +192,9 @@ export default function SettingsScreen() {
     setProgress("Fetching metadata…");
     try {
       const result = await syncNow({
-        onProgress: (done, total) => setProgress(`Files ${done}/${total}`),
+        // "Checked", not "downloaded": already-offline documents are skipped in
+        // an instant, so this counter runs ahead of the offline count on purpose.
+        onProgress: (done, total) => setProgress(`Checked ${done} of ${total}`),
       });
       setProgress(
         result.skipped

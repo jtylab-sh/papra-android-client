@@ -1,4 +1,5 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { useIsFocused } from "@react-navigation/native";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useRef, useState, type PropsWithChildren } from "react";
 import { Alert, BackHandler, FlatList, RefreshControl, ScrollView, View } from "react-native";
@@ -54,6 +55,9 @@ const SORTS = [
 
 export default function DocumentsScreen() {
   const theme = useTheme<AppTheme>();
+  // The FAB lives in a Portal and drawer screens stay mounted, so without
+  // this it would float over every other page too.
+  const isFocused = useIsFocused();
   const [search, setSearch] = useState("");
   const [docs, setDocs] = useState<CachedDocument[]>([]);
   const [refreshing, setRefreshing] = useState(false);
@@ -586,8 +590,8 @@ export default function DocumentsScreen() {
       <Portal>
         <FAB.Group
           open={fabOpen}
-          visible={selected === null}
-          icon={fabOpen ? "close" : "plus"}
+          visible={selected === null && isFocused}
+          icon={fabOpen ? "close" : "tray-arrow-up"}
           actions={[
             { icon: "line-scan", label: "Scan", onPress: startScan },
             { icon: "file-upload-outline", label: "Upload", onPress: startUpload },

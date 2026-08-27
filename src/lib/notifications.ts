@@ -163,7 +163,7 @@ export async function updateSyncProgress(done: number, total: number, asService 
   await notifee.displayNotification({
     id: SYNC_PROGRESS_ID,
     title: "Syncing documents",
-    body: `${done} / ${total}`,
+    body: `Checked ${done} of ${total}`,
     android: { ...(asService ? FGS_ANDROID : plain), progress: { max: total, current: done } },
   });
 }
