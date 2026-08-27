@@ -1,20 +1,21 @@
-import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Alert, FlatList, RefreshControl, ScrollView, View } from "react-native";
 import {
   Button as PaperButton,
-  Card,
   Chip,
   Dialog,
+  FAB,
   IconButton,
   Portal,
+  Searchbar,
   Surface,
   Text,
   TextInput,
   useTheme,
 } from "react-native-paper";
-import { Input, Muted, Row, TagChip, formatBytes, formatDate } from "../../components/ui";
+import { DocumentRow } from "../../components/document-row";
+import { Muted } from "../../components/ui";
 import { spacing, type AppTheme } from "../../constants/theme";
 import { countCachedDocuments, getCachedDocument, listCachedDocuments, type CachedDocument } from "../../lib/db";
 import {
@@ -135,6 +136,8 @@ export default function DocumentsScreen() {
     });
   }, [serverMode, docs.length, search, total, runServerSearch]);
 
+  const [fabOpen, setFabOpen] = useState(false);
+
   // --- views (saved searches, like the Papra sidebar) ---
   const [views, setViews] = useState<PapraDocumentView[]>([]);
   const [viewName, setViewName] = useState<string | null>(null); // non-null = save dialog open
@@ -247,18 +250,14 @@ export default function DocumentsScreen() {
         </Surface>
       ) : null}
       <View style={{ padding: spacing.md, paddingBottom: 0 }}>
-        <Input
+        <Searchbar
           placeholder={'Search — tag:invoice, NOT draft, "phrase"'}
           value={search}
           onChangeText={onSearchChange}
           autoCapitalize="none"
           autoCorrect={false}
-          returnKeyType="search"
-          right={
-            search.trim() ? (
-              <TextInput.Icon icon="bookmark-plus-outline" onPress={() => setViewName("")} forceTextInputFocus={false} />
-            ) : null
-          }
+          traileringIcon={search.trim() ? "bookmark-plus-outline" : undefined}
+          onTraileringIconPress={() => setViewName("")}
         />
         {views.length > 0 && !selected ? (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: spacing.sm }}>
@@ -297,13 +296,31 @@ export default function DocumentsScreen() {
         renderItem={({ item }) => (
           <DocumentRow
             doc={item}
-            selecting={selected !== null}
-            isSelected={selected?.has(item.id) ?? false}
-            onToggle={() => toggleSelect(item.id)}
+            selected={selected?.has(item.id) ?? false}
+            onPress={() => (selected ? toggleSelect(item.id) : router.push(`/document/${item.id}`))}
+            onLongPress={() => toggleSelect(item.id)}
           />
         )}
       />
       <Portal>
+        <FAB.Group
+          open={fabOpen}
+          visible={selected === null}
+          icon={fabOpen ? "close" : "plus"}
+          actions={[
+            {
+              icon: "line-scan",
+              label: "Scan",
+              onPress: () => router.push({ pathname: "/upload", params: { mode: "scan" } }),
+            },
+            {
+              icon: "file-upload-outline",
+              label: "Upload",
+              onPress: () => router.push({ pathname: "/upload", params: { mode: "pick" } }),
+            },
+          ]}
+          onStateChange={({ open }) => setFabOpen(open)}
+        />
         <Dialog visible={viewName !== null} onDismiss={() => setViewName(null)}>
           <Dialog.Title>Save view</Dialog.Title>
           <Dialog.Content style={{ gap: spacing.sm }}>
@@ -326,53 +343,5 @@ export default function DocumentsScreen() {
         </Dialog>
       </Portal>
     </View>
-  );
-}
-
-function DocumentRow({
-  doc,
-  selecting,
-  isSelected,
-  onToggle,
-}: {
-  doc: CachedDocument;
-  selecting: boolean;
-  isSelected: boolean;
-  onToggle: () => void;
-}) {
-  const theme = useTheme<AppTheme>();
-  return (
-    <Card
-      mode="contained"
-      style={[
-        { marginBottom: spacing.sm },
-        isSelected && { backgroundColor: theme.colors.secondaryContainer },
-      ]}
-      onPress={() => (selecting ? onToggle() : router.push(`/document/${doc.id}`))}
-      onLongPress={onToggle}
-    >
-      <Card.Content>
-        <Text variant="titleSmall" numberOfLines={1}>
-          {doc.name}
-        </Text>
-        <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant, marginTop: 2 }}>
-          {formatDate(doc.createdAt)}
-          {doc.originalSize ? `  ·  ${formatBytes(doc.originalSize)}` : ""}
-          {doc.fileUri ? (
-            <>
-              {"  ·  "}
-              <MaterialCommunityIcons name="cloud-check-outline" size={14} color={theme.colors.primary} />
-            </>
-          ) : null}
-        </Text>
-        {doc.tags.length > 0 && (
-          <View style={{ flexDirection: "row", flexWrap: "wrap", marginTop: 8 }}>
-            {doc.tags.map((t) => (
-              <TagChip key={t.id} name={t.name} color={t.color} />
-            ))}
-          </View>
-        )}
-      </Card.Content>
-    </Card>
   );
 }

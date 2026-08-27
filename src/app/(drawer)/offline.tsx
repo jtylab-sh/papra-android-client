@@ -1,9 +1,9 @@
-import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import { FlatList, View } from "react-native";
-import { Card, Text, useTheme } from "react-native-paper";
-import { Input, Muted, TagChip, formatBytes, formatDate } from "../../components/ui";
+import { Searchbar, useTheme } from "react-native-paper";
+import { DocumentRow } from "../../components/document-row";
+import { Muted } from "../../components/ui";
 import { spacing, type AppTheme } from "../../constants/theme";
 import { countOfflineDocuments, listOfflineDocuments, type CachedDocument } from "../../lib/db";
 
@@ -45,13 +45,12 @@ export default function OfflineScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
       <View style={{ padding: spacing.md, paddingBottom: 0 }}>
-        <Input
+        <Searchbar
           placeholder="Search offline documents"
           value={search}
           onChangeText={onSearchChange}
           autoCapitalize="none"
           autoCorrect={false}
-          returnKeyType="search"
         />
       </View>
       <FlatList
@@ -66,34 +65,8 @@ export default function OfflineScreen() {
             <Muted>{docs.length < total ? `${docs.length} of ${total}` : `${total} document${total === 1 ? "" : "s"}`}</Muted>
           ) : null
         }
-        renderItem={({ item }) => <DocumentRow doc={item} />}
+        renderItem={({ item }) => <DocumentRow doc={item} onPress={() => router.push(`/document/${item.id}`)} />}
       />
     </View>
-  );
-}
-
-function DocumentRow({ doc }: { doc: CachedDocument }) {
-  const theme = useTheme<AppTheme>();
-  return (
-    <Card mode="contained" style={{ marginBottom: spacing.sm }} onPress={() => router.push(`/document/${doc.id}`)}>
-      <Card.Content>
-        <Text variant="titleSmall" numberOfLines={1}>
-          {doc.name}
-        </Text>
-        <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant, marginTop: 2 }}>
-          {formatDate(doc.createdAt)}
-          {doc.originalSize ? `  ·  ${formatBytes(doc.originalSize)}` : ""}
-          {"  ·  "}
-          <MaterialCommunityIcons name="cloud-check-outline" size={14} color={theme.colors.primary} />
-        </Text>
-        {doc.tags.length > 0 && (
-          <View style={{ flexDirection: "row", flexWrap: "wrap", marginTop: 8 }}>
-            {doc.tags.map((t) => (
-              <TagChip key={t.id} name={t.name} color={t.color} />
-            ))}
-          </View>
-        )}
-      </Card.Content>
-    </Card>
   );
 }

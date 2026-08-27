@@ -1,8 +1,7 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { router } from "expo-router";
 import { Drawer } from "expo-router/drawer";
-import { View, type ColorValue } from "react-native";
-import { IconButton, useTheme } from "react-native-paper";
+import { type ColorValue } from "react-native";
+import { useTheme } from "react-native-paper";
 import { type AppTheme } from "../../constants/theme";
 
 type IconName = keyof typeof MaterialCommunityIcons.glyphMap;
@@ -32,15 +31,6 @@ export default function DrawerLayout() {
         options={{
           title: "Documents",
           drawerIcon: drawerIcon("file-document-multiple-outline"),
-          headerRight: () => (
-            <View style={{ flexDirection: "row" }}>
-              <IconButton
-                icon="line-scan"
-                onPress={() => router.push({ pathname: "/upload", params: { mode: "scan" } })}
-              />
-              <IconButton icon="plus" onPress={() => router.push({ pathname: "/upload", params: { mode: "pick" } })} />
-            </View>
-          ),
         }}
       />
       <Drawer.Screen
