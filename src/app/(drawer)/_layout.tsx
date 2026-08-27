@@ -1,7 +1,14 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { Drawer } from "expo-router/drawer";
-import { type ColorValue } from "react-native";
+import {
+  Drawer,
+  DrawerContentScrollView,
+  DrawerItem,
+  DrawerItemList,
+  type DrawerContentComponentProps,
+} from "expo-router/drawer";
+import { type ColorValue, Linking } from "react-native";
 import { useTheme } from "react-native-paper";
+import { getSettings } from "~/lib/settings";
 import { type AppTheme } from "~/constants/theme";
 
 type IconName = keyof typeof MaterialCommunityIcons.glyphMap;
@@ -10,6 +17,11 @@ function drawerIcon(name: IconName) {
   return ({ color, size }: { color: ColorValue; size: number }) => (
     <MaterialCommunityIcons name={name} color={color as string} size={size} />
   );
+}
+
+async function openInBrowser() {
+  const s = await getSettings();
+  if (s.serverUrl) await Linking.openURL(s.serverUrl).catch(() => {});
 }
 
 export default function DrawerLayout() {
@@ -26,6 +38,17 @@ export default function DrawerLayout() {
         drawerActiveBackgroundColor: theme.colors.secondaryContainer,
         drawerInactiveTintColor: theme.colors.onSurfaceVariant,
       }}
+      drawerContent={(props: DrawerContentComponentProps) => (
+        <DrawerContentScrollView {...props}>
+          <DrawerItemList {...props} />
+          <DrawerItem
+            label="Open in browser"
+            icon={drawerIcon("open-in-new")}
+            onPress={openInBrowser}
+            inactiveTintColor={theme.colors.onSurfaceVariant}
+          />
+        </DrawerContentScrollView>
+      )}
     >
       <Drawer.Screen
         name="home"
