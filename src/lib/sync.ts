@@ -131,13 +131,25 @@ export async function ensureNoMedia(exportDirUri: string): Promise<void> {
   setMeta(key, "1");
 }
 
-async function exportCopy(id: string, exportDirUri: string): Promise<void> {
+/** Names currently present in the export folder, or null when unreadable. */
+async function listExportNames(exportDirUri: string): Promise<Set<string> | null> {
+  try {
+    const entries = await FileSystemLegacy.StorageAccessFramework.readDirectoryAsync(exportDirUri);
+    return new Set(entries.map((uri) => decodeURIComponent(uri.split("%2F").pop() ?? "")));
+  } catch {
+    return null; // folder revoked/offline — don't force re-exports on bad info
+  }
+}
+
+async function exportCopy(id: string, exportDirUri: string, existingNames: Set<string> | null): Promise<void> {
   if (!exportDirUri) return;
   await ensureNoMedia(exportDirUri);
   const cached = getCachedDocument(id);
   if (!cached?.fileUri) return;
   const metaKey = `exported:${id}`;
-  if (getMeta(metaKey) === exportDirUri) return; // already exported to this folder
+  // Skip only when the exported copy is verifiably still there — a manually
+  // deleted file gets re-exported on the next sync.
+  if (getMeta(metaKey) === exportDirUri && (!existingNames || existingNames.has(displayFileName(cached)))) return;
   try {
     const data = await FileSystemLegacy.readAsStringAsync(cached.fileUri, {
       encoding: FileSystemLegacy.EncodingType.Base64,
@@ -227,6 +239,7 @@ export async function syncNow(
   // Foreground service + progress notification: keeps a manual sync running
   // when the user leaves the app. Never from background tasks — Android 12+
   // forbids starting a foreground service from the background.
+  const exportNames = s.offlineExportDirUri ? await listExportNames(s.offlineExportDirUri) : null;
   const useService = !opts.background && s.notifySyncProgress;
   const plainProgress = Boolean(opts.background) && s.notifySyncProgress;
   if (useService) await startSyncService().catch(() => {});
@@ -243,7 +256,7 @@ export async function syncNow(
           lastError = e instanceof Error ? e.message : String(e);
         }
       }
-      await exportCopy(id, s.offlineExportDirUri);
+      await exportCopy(id, s.offlineExportDirUri, exportNames);
       opts.onProgress?.(++done, ids.length);
       if (useService || plainProgress) updateSyncProgress(done, ids.length, useService).catch(() => {});
     }
