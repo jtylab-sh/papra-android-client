@@ -27,6 +27,7 @@ function draftSettings(serverUrl: string): Settings {
     notifySyncFailures: false,
     notifySessionExpired: false,
     notifyTrashPurge: false,
+    notifySyncProgress: false,
   };
 }
 

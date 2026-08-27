@@ -6,6 +6,7 @@
  * channel from Android settings. See docs/NOTIFICATIONS.md.
  */
 import * as Notifications from "expo-notifications";
+import notifee, { AndroidForegroundServiceType, AndroidImportance } from "react-native-notify-kit";
 import { getSettings } from "./settings";
 
 Notifications.setNotificationHandler({
@@ -76,4 +77,51 @@ export async function notifyTrashPurge(count: number, withinDays: number): Promi
     "Trash purge soon",
     `${count} trashed document${count === 1 ? "" : "s"} will be permanently deleted within ${withinDays} day${withinDays === 1 ? "" : "s"}.`,
   );
+}
+
+/**
+ * Sync progress: an ongoing notification bound to a dataSync foreground
+ * service (react-native-notify-kit), so a manual sync keeps running when the
+ * user leaves the app. The service runner lives in index.js; stopping the
+ * service is what ends it.
+ */
+const SYNC_PROGRESS_ID = "sync-progress";
+const FGS_ANDROID = {
+  channelId: SYNC_PROGRESS_ID,
+  asForegroundService: true,
+  foregroundServiceTypes: [AndroidForegroundServiceType.FOREGROUND_SERVICE_TYPE_DATA_SYNC],
+  ongoing: true,
+  onlyAlertOnce: true,
+};
+let lastProgressAt = 0;
+
+export async function startSyncService(): Promise<void> {
+  await notifee.createChannel({
+    id: SYNC_PROGRESS_ID,
+    name: "Sync progress",
+    importance: AndroidImportance.LOW,
+  });
+  await notifee.displayNotification({
+    id: SYNC_PROGRESS_ID,
+    title: "Syncing documents",
+    body: "Fetching metadata\u2026",
+    android: { ...FGS_ANDROID, progress: { indeterminate: true } },
+  });
+}
+
+export async function updateSyncProgress(done: number, total: number): Promise<void> {
+  const now = Date.now();
+  if (done < total && now - lastProgressAt < 1000) return; // at most 1 update/s
+  lastProgressAt = now;
+  await notifee.displayNotification({
+    id: SYNC_PROGRESS_ID,
+    title: "Syncing documents",
+    body: `${done} / ${total}`,
+    android: { ...FGS_ANDROID, progress: { max: total, current: done } },
+  });
+}
+
+export async function stopSyncService(): Promise<void> {
+  await notifee.stopForegroundService();
+  await notifee.cancelNotification(SYNC_PROGRESS_ID).catch(() => {});
 }

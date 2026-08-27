@@ -15,7 +15,10 @@
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.POST_NOTIFICATIONS"
+      ]
     },
     "plugins": [
       "expo-router",
@@ -81,6 +84,18 @@
         "react-native-document-scanner-plugin",
         {
           "cameraPermission": "Papra uses the camera to scan documents."
+        }
+      ],
+      [
+        "react-native-notify-kit",
+        {
+          "android": {
+            "foregroundService": {
+              "types": [
+                "dataSync"
+              ]
+            }
+          }
         }
       ]
     ],

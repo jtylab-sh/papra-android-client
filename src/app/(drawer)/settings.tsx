@@ -128,7 +128,15 @@ export default function SettingsScreen() {
   }, [newOrgName, orgs]);
 
   const toggleNotification = useCallback(
-    async (key: "notifyNewDocuments" | "notifySyncFailures" | "notifySessionExpired" | "notifyTrashPurge", value: boolean) => {
+    async (
+      key:
+        | "notifyNewDocuments"
+        | "notifySyncFailures"
+        | "notifySessionExpired"
+        | "notifyTrashPurge"
+        | "notifySyncProgress",
+      value: boolean,
+    ) => {
       if (value && !(await requestNotificationPermission())) {
         Alert.alert("No permission", "Allow notifications for Papra in Android settings first.");
         return;
@@ -368,6 +376,11 @@ export default function SettingsScreen() {
             ["notifySyncFailures", "Sync failures", "After 3 failed background syncs in a row"],
             ["notifySessionExpired", "Session expired", "When the server wants you to sign in again"],
             ["notifyTrashPurge", "Trash purge warning", "When trashed documents are within 3 days of permanent deletion"],
+            [
+              "notifySyncProgress",
+              "Sync progress",
+              "Ongoing progress notification during a manual sync \u2014 also keeps the sync running when you leave the app",
+            ],
           ] as const
         ).map(([key, label, desc]) => (
           <Row key={key} style={{ justifyContent: "space-between", marginTop: spacing.sm }}>

@@ -27,6 +27,9 @@ import {
   notifySessionExpired,
   notifySyncFailures,
   notifyTrashPurge,
+  startSyncService,
+  stopSyncService,
+  updateSyncProgress,
 } from "./notifications";
 
 export const SYNC_TASK = "papra-sync";
@@ -198,20 +201,30 @@ export async function syncNow(
   let failed = 0;
   let done = 0;
   let lastError = "";
-  for (const id of ids) {
-    const cached = getCachedDocument(id);
-    const needsFile = !cached?.fileUri || !new File(cached.fileUri).exists;
-    if (needsFile) {
-      try {
-        await downloadWithRetry(id);
-        downloaded++;
-      } catch (e) {
-        failed++;
-        lastError = e instanceof Error ? e.message : String(e);
+  // Foreground service + progress notification: keeps a manual sync running
+  // when the user leaves the app. Never from background tasks — Android 12+
+  // forbids starting a foreground service from the background.
+  const useService = !opts.background && s.notifySyncProgress;
+  if (useService) await startSyncService().catch(() => {});
+  try {
+    for (const id of ids) {
+      const cached = getCachedDocument(id);
+      const needsFile = !cached?.fileUri || !new File(cached.fileUri).exists;
+      if (needsFile) {
+        try {
+          await downloadWithRetry(id);
+          downloaded++;
+        } catch (e) {
+          failed++;
+          lastError = e instanceof Error ? e.message : String(e);
+        }
       }
+      await exportCopy(id, s.offlineExportDirUri);
+      opts.onProgress?.(++done, ids.length);
+      if (useService) updateSyncProgress(done, ids.length).catch(() => {});
     }
-    await exportCopy(id, s.offlineExportDirUri);
-    opts.onProgress?.(++done, ids.length);
+  } finally {
+    if (useService) await stopSyncService().catch(() => {});
   }
   setMeta("lastSyncAt", new Date().toISOString());
   setMeta("lastSyncResult", JSON.stringify({ documents: ids.length, downloaded, failed, lastError }));

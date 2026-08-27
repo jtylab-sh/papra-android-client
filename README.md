@@ -45,8 +45,12 @@ project.
   *Recent documents* list fed from the offline mirror (refreshed after every sync; rows open the
   document).
 - **Notifications** (all opt-in, per-event toggles in Settings; permission asked on first enable):
-  new documents found by background sync, repeated sync failures, session expired, and a warning
-  when trashed documents are within 3 days of permanent deletion.
+  new documents found by background sync, repeated sync failures, session expired, a warning
+  when trashed documents are within 3 days of permanent deletion, and a live sync-progress
+  notification.
+- **Sync survives leaving the app**: with the sync-progress notification enabled, a manual sync
+  runs inside an Android foreground service (`dataSync`), so all documents keep downloading with a
+  progress notification even when you switch apps.
 - **Biometric lock** (fingerprint / face) with a configurable grace period (default 5 min), an
   auto-opening prompt, and sign-out from the lock screen.
 
@@ -82,7 +86,9 @@ The APK is built for **arm64 (64-bit)** devices — any Android phone from rough
   the exact moment, batches jobs, and by default waits for network availability and a non-low battery.
 - Force-stopping the app suspends background jobs until the app is opened again. That is Android policy,
   not a bug.
-- "Sync now" in Settings runs the same job immediately in the foreground.
+- "Sync now" in Settings runs the same job immediately. With the sync-progress notification enabled
+  (Settings -> Notifications) it runs inside a foreground service and keeps going when you leave the
+  app; without it, Android may suspend the app - and the sync - shortly after you switch away.
 
 ## Development
 

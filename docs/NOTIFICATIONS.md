@@ -1,9 +1,11 @@
 # Notification plan
 
 **Status: implemented** (src/lib/notifications.ts) — per-event opt-in toggles in
-Settings, permission requested on first enable, events fired from background
-syncs only. Not implemented: transfer progress bars (needs a foreground
-service; on demand).
+Settings, permission requested on first enable. Sync progress is also
+implemented: an ongoing progress notification bound to a `dataSync` foreground
+service (react-native-notify-kit, the maintained Notifee successor), which
+keeps a manual sync running when the user leaves the app. Not implemented:
+per-upload transfer notifications.
 
 All notifications are **local** (scheduled/shown by the app itself via
 `expo-notifications`). Real push would require FCM plus a server-side webhook

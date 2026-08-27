@@ -29,6 +29,12 @@ export interface Settings {
   notifySyncFailures: boolean;
   notifySessionExpired: boolean;
   notifyTrashPurge: boolean;
+  /**
+   * Ongoing progress notification during manual syncs. Doubles as the switch
+   * for the dataSync foreground service that keeps a sync alive when the app
+   * is left mid-sync (Android requires a visible notification for that).
+   */
+  notifySyncProgress: boolean;
 }
 
 const DEFAULTS: Settings = {
@@ -47,6 +53,7 @@ const DEFAULTS: Settings = {
   notifySyncFailures: false,
   notifySessionExpired: false,
   notifyTrashPurge: false,
+  notifySyncProgress: false,
 };
 
 const KEY = "papra.settings";
