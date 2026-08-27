@@ -1,5 +1,5 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { router, useFocusEffect, useIsFocused } from "expo-router";
+import { router, useFocusEffect, useIsFocused, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useRef, useState, type PropsWithChildren } from "react";
 import { Alert, BackHandler, FlatList, RefreshControl, ScrollView, View } from "react-native";
 import ReanimatedSwipeable, { type SwipeableMethods } from "react-native-gesture-handler/ReanimatedSwipeable";
@@ -184,6 +184,15 @@ export default function DocumentsScreen() {
   useEffect(() => () => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
   }, []);
+
+  // Arriving with ?q= (a tag tapped on a document page) seeds the search box.
+  const qParam = useLocalSearchParams<{ q?: string }>().q;
+  useEffect(() => {
+    if (qParam) {
+      onSearchChange(qParam);
+      router.setParams({ q: "" }); // consume it, back-nav must not re-apply
+    }
+  }, [qParam, onSearchChange]);
 
   const loadMore = useCallback(() => {
     if (serverMode) {

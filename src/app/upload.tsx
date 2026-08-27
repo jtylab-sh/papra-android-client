@@ -4,7 +4,8 @@ import { FlatList, View } from "react-native";
 import { Text, useTheme } from "react-native-paper";
 import { Button, Card, Muted, Row } from "~/components/ui";
 import { spacing, type AppTheme } from "~/constants/theme";
-import { uploadDocument } from "~/lib/papra";
+import { ApiError, uploadDocument } from "~/lib/papra";
+import { enqueueUpload } from "~/lib/uploads";
 import { pickFiles, scanDocuments } from "~/lib/pickers";
 import { syncMetadata } from "~/lib/sync";
 
@@ -12,7 +13,7 @@ interface PendingFile {
   uri: string;
   name: string;
   mimeType?: string;
-  status: "pending" | "uploading" | "done" | "failed";
+  status: "pending" | "uploading" | "done" | "failed" | "queued";
   error?: string;
 }
 
@@ -57,6 +58,11 @@ export default function UploadScreen() {
       scan().then((got) => {
         if (!got) router.back();
       });
+    } else if (params.mode === "pick") {
+      // Launcher shortcut: straight into the file picker.
+      pick().then((got) => {
+        if (!got) router.back();
+      });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -64,12 +70,18 @@ export default function UploadScreen() {
   const upload = useCallback(async () => {
     setBusy(true);
     for (let i = 0; i < files.length; i++) {
-      if (files[i].status === "done") continue;
+      if (files[i].status === "done" || files[i].status === "queued") continue;
       setFiles((prev) => prev.map((f, j) => (j === i ? { ...f, status: "uploading" } : f)));
       try {
         await uploadDocument(files[i]);
         setFiles((prev) => prev.map((f, j) => (j === i ? { ...f, status: "done" } : f)));
       } catch (e) {
+        if (e instanceof ApiError && e.status === 0) {
+          // Offline: park the file in the queue, it uploads on reconnect.
+          await enqueueUpload(files[i]).catch(() => {});
+          setFiles((prev) => prev.map((f, j) => (j === i ? { ...f, status: "queued" } : f)));
+          continue;
+        }
         setFiles((prev) =>
           prev.map((f, j) =>
             j === i ? { ...f, status: "failed", error: e instanceof Error ? e.message : String(e) } : f,
@@ -81,12 +93,13 @@ export default function UploadScreen() {
     syncMetadata().catch(() => {});
   }, [files]);
 
-  const allDone = files.length > 0 && files.every((f) => f.status === "done");
+  const allDone = files.length > 0 && files.every((f) => f.status === "done" || f.status === "queued");
   const statusColor = {
     pending: theme.colors.onSurfaceVariant,
     uploading: theme.colors.tertiary,
     done: theme.colors.primary,
     failed: theme.colors.error,
+    queued: theme.colors.tertiary,
   };
 
   return (
@@ -110,7 +123,7 @@ export default function UploadScreen() {
               {item.name}
             </Text>
             <Text variant="bodySmall" style={{ color: statusColor[item.status], marginTop: 2 }}>
-              {item.status}
+              {item.status === "queued" ? "queued - uploads when back online" : item.status}
               {item.error ? ` - ${item.error}` : ""}
             </Text>
           </Card>
@@ -119,7 +132,7 @@ export default function UploadScreen() {
       {allDone ? (
         <Button label="Done" onPress={() => router.back()} />
       ) : (
-        <Button label={`Upload ${files.filter((f) => f.status !== "done").length} file(s)`} onPress={upload} loading={busy} disabled={files.length === 0} />
+        <Button label={`Upload ${files.filter((f) => f.status !== "done" && f.status !== "queued").length} file(s)`} onPress={upload} loading={busy} disabled={files.length === 0} />
       )}
     </View>
   );

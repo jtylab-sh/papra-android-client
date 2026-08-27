@@ -4,6 +4,8 @@ import { useShareIntent } from "expo-share-intent";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useRef, useState } from "react";
 import * as Network from "expo-network";
+import * as QuickActions from "expo-quick-actions";
+import { useQuickActionRouting, type RouterAction } from "expo-quick-actions/router";
 import { Alert, AppState, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { PaperProvider, Text } from "react-native-paper";
@@ -11,7 +13,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button, Muted, Screen, Title } from "~/components/ui";
 import { useAppTheme } from "~/constants/theme";
 import { wireNotificationNavigation } from "~/lib/notifications";
+import { useOnReconnect } from "~/lib/network";
 import { getSettings } from "~/lib/settings";
+import { flushUploads } from "~/lib/uploads";
 // Side effect: defines the background sync task at module scope.
 import { signOutEverything } from "~/lib/sync";
 import { maybePromptUpdate } from "~/lib/version";
@@ -36,6 +40,24 @@ export default function RootLayout() {
       if (s.updateCheckEnabled) maybePromptUpdate();
     });
   }, []);
+
+  // Long-press the launcher icon: Scan / Upload / Search.
+  useQuickActionRouting();
+  useEffect(() => {
+    QuickActions.setItems<RouterAction>([
+      { id: "scan", title: "Scan", params: { href: "/upload?mode=scan" } },
+      { id: "upload", title: "Upload", params: { href: "/upload?mode=pick" } },
+      { id: "search", title: "Search", params: { href: "/" } },
+    ]).catch(() => {});
+  }, []);
+
+  // Files queued while offline: send on start and whenever we come back online.
+  useEffect(() => {
+    flushUploads().catch(() => {});
+  }, []);
+  useOnReconnect(() => {
+    flushUploads().catch(() => {});
+  });
 
   // Tapping any of our notifications opens its page (sync progress -> Settings, ...).
   useEffect(

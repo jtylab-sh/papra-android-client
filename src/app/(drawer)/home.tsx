@@ -15,6 +15,7 @@ import { getDocumentsStatistics, type PapraOrgStats } from "~/lib/papra";
 import { pickFiles, scanDocuments } from "~/lib/pickers";
 import { getSettings, isConnected } from "~/lib/settings";
 import { countOfflineOnDisk, syncMetadata } from "~/lib/sync";
+import { countQueuedUploads } from "~/lib/uploads";
 
 export default function HomeScreen() {
   const theme = useTheme<AppTheme>();
@@ -22,9 +23,11 @@ export default function HomeScreen() {
   const [recent, setRecent] = useState<CachedDocument[]>([]);
   const [stats, setStats] = useState<PapraOrgStats | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [queued, setQueued] = useState(0);
 
   const loadLocal = useCallback(() => {
     setRecent(listCachedDocuments("", 20, 0));
+    countQueuedUploads().then(setQueued);
   }, []);
 
   useFocusEffect(
@@ -100,6 +103,7 @@ export default function HomeScreen() {
               <Stat label="Size" value={stats ? formatBytes(stats.documentsSize) : "-"} />
               <Stat label="In trash" value={stats ? String(stats.deletedDocumentsCount) : "-"} />
               <Stat label="Offline" value={String(countOfflineOnDisk())} />
+              {queued > 0 ? <Stat label="Queued" value={String(queued)} /> : null}
             </Row>
           </Card>
           <Text variant="titleMedium">Recent documents</Text>

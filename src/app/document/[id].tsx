@@ -3,7 +3,8 @@ import * as IntentLauncher from "expo-intent-launcher";
 import * as Sharing from "expo-sharing";
 import { Stack, router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import { Alert, Image, Pressable, ScrollView, View } from "react-native";
+import * as Clipboard from "expo-clipboard";
+import { Alert, Image, Linking, Pressable, ScrollView, ToastAndroid, View } from "react-native";
 import {
   Button as PaperButton,
   Chip,
@@ -34,6 +35,7 @@ import {
   type PapraTag,
 } from "~/lib/papra";
 import { useOnReconnect } from "~/lib/network";
+import { getSettings } from "~/lib/settings";
 import { isPrintCancel, printDocument } from "~/lib/print";
 import { ensureLocalFile, localFileNamedForUser, removeLocalCopy } from "~/lib/sync";
 
@@ -149,6 +151,12 @@ export default function DocumentScreen() {
     withFile("share", async (uri, mime) => {
       await Sharing.shareAsync(uri, { mimeType: mime });
     });
+
+  const openInWeb = useCallback(async () => {
+    const s = await getSettings();
+    if (!s.serverUrl || !id) return;
+    await Linking.openURL(`${s.serverUrl}/organizations/${s.organizationId}/documents/${id}`).catch(() => {});
+  }, [id]);
 
   const print = async () => {
     if (!id) return;
@@ -292,7 +300,14 @@ export default function DocumentScreen() {
       style={{ flex: 1, backgroundColor: theme.colors.background }}
       contentContainerStyle={{ padding: spacing.md, gap: spacing.md }}
     >
-      <Stack.Screen options={{ title: doc.name ?? "Document" }} />
+      <Stack.Screen
+        options={{
+          title: doc.name ?? "Document",
+          headerRight: () => (
+            <IconButton icon="open-in-new" accessibilityLabel="Open in the web app" onPress={openInWeb} />
+          ),
+        }}
+      />
       <View style={{ alignItems: "center", gap: spacing.sm }}>
         {isImage ? (
           <Pressable onPress={() => setViewerOpen(true)} style={{ width: "100%" }}>
@@ -340,7 +355,18 @@ export default function DocumentScreen() {
         <Muted>Tags</Muted>
         <View style={{ flexDirection: "row", flexWrap: "wrap", marginTop: 8, alignItems: "center" }}>
           {tags.map((t) => (
-            <TagChip key={t.id} name={t.name} color={t.color} onClose={() => removeTag(t)} />
+            <TagChip
+              key={t.id}
+              name={t.name}
+              color={t.color}
+              onClose={() => removeTag(t)}
+              onPress={() =>
+                router.push({
+                  pathname: "/",
+                  params: { q: /\s/.test(t.name) ? `tag:"${t.name}"` : `tag:${t.name}` },
+                })
+              }
+            />
           ))}
           <Chip icon="plus" compact mode="outlined" onPress={openTagPicker} style={{ marginRight: 6, marginBottom: 6 }}>
             Add tag
@@ -454,6 +480,19 @@ export default function DocumentScreen() {
       {Boolean(live?.content) && (
         <Card style={{ padding: 0, overflow: "hidden" }}>
           <List.Accordion title="Extracted text" left={(p) => <List.Icon {...p} icon="text-recognition" />}>
+            <View style={{ alignItems: "flex-end", paddingRight: spacing.sm }}>
+              <PaperButton
+                icon="content-copy"
+                compact
+                onPress={() =>
+                  Clipboard.setStringAsync(live?.content ?? "").then(() =>
+                    ToastAndroid.show("Copied", ToastAndroid.SHORT),
+                  )
+                }
+              >
+                Copy
+              </PaperButton>
+            </View>
             <Text
               variant="bodySmall"
               style={{ paddingTop: spacing.sm, paddingHorizontal: spacing.md, paddingBottom: spacing.md, lineHeight: 19 }}

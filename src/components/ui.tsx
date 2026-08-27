@@ -76,14 +76,14 @@ export function Card({ children, style }: PropsWithChildren<{ style?: ViewStyle 
   );
 }
 
-export function TagChip({ name, color, onClose }: { name: string; color?: string; onClose?: () => void }) {
+export function TagChip({ name, color, onClose, onPress }: { name: string; color?: string; onClose?: () => void; onPress?: () => void }) {
   const theme = useTheme<AppTheme>();
   // Tags carry a server-defined hex colour — keep it as the chip's own tint.
   // Custom pill: Paper's Chip renders its close icon outside the outline in
   // compact mode, so the ✕ sits inline here instead.
   const tint = color || theme.colors.primary;
   return (
-    <View style={[styles.chip, styles.tagPill, { borderColor: tint }]}>
+    <Pressable onPress={onPress} disabled={!onPress} style={[styles.chip, styles.tagPill, { borderColor: tint }]}>
       <Text variant="labelMedium" numberOfLines={1} style={{ color: tint, flexShrink: 1 }}>
         {name}
       </Text>
@@ -97,7 +97,7 @@ export function TagChip({ name, color, onClose }: { name: string; color?: string
           <MaterialCommunityIcons name="close" size={14} color={tint} />
         </Pressable>
       ) : null}
-    </View>
+    </Pressable>
   );
 }
 
