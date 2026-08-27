@@ -87,6 +87,8 @@ jobs:
       VERSION: ${{ needs.version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # tags + history for the release changelog
       - uses: actions/setup-node@v4
         with:
           node-version: "24"
@@ -191,5 +193,21 @@ jobs:
           set -euo pipefail
           apk="papra-android-client-v$VERSION.apk"
           mv android/app/build/outputs/apk/release/app-release.apk "$apk"
-          # Tag + release + asset in one atomic step — only reached on a green build.
-          gh release create "v$VERSION" --target "$GITHUB_SHA" --title "v$VERSION" --generate-notes "$apk"
+          # Changelog: conventional commits since the previous release tag,
+          # grouped into Features / Fixes / Other.
+          last=$(git tag --list 'v*' --sort=-v:refname | head -1)
+          subjects=$(git log --reverse --format='%s' ${last:+$last..HEAD})
+          strip='s/^[a-z]+(\([^)]+\))?!?: */- /'
+          feats=$(grep -E '^feat' <<<"$subjects" | sed -E "$strip" || true)
+          fixes=$(grep -E '^fix' <<<"$subjects" | sed -E "$strip" || true)
+          other=$(grep -Ev '^(feat|fix)' <<<"$subjects" | sed -E "$strip" || true)
+          {
+            [ -n "$feats" ] && printf '## Features\n%s\n\n' "$feats"
+            [ -n "$fixes" ] && printf '## Fixes\n%s\n\n' "$fixes"
+            [ -n "$other" ] && printf '## Other\n%s\n\n' "$other"
+          } > notes.md || true
+          cat notes.md
+          # Idempotent: replace a stale same-name release (e.g. left by a deleted tag).
+          gh release delete "v$VERSION" --yes 2>/dev/null || true
+          # Tag + release + asset in one step — only reached on a green build.
+          gh release create "v$VERSION" --target "$GITHUB_SHA" --title "v$VERSION" --notes-file notes.md "$apk"
