@@ -102,6 +102,33 @@ export function listCachedDocuments(search = "", limit = -1, offset = 0): Cached
   return (rows as Record<string, unknown>[]).map(toCached);
 }
 
+export function listOfflineDocuments(search = "", limit = -1, offset = 0): CachedDocument[] {
+  const d = getDb();
+  const rows = search
+    ? d.getAllSync(
+        "select * from documents where fileUri is not null and (name like ? or originalName like ?) order by createdAt desc limit ? offset ?",
+        [`%${search}%`, `%${search}%`, limit, offset],
+      )
+    : d.getAllSync("select * from documents where fileUri is not null order by createdAt desc limit ? offset ?", [
+        limit,
+        offset,
+      ]);
+  return (rows as Record<string, unknown>[]).map(toCached);
+}
+
+export function countOfflineDocuments(search = ""): number {
+  const d = getDb();
+  const row = (
+    search
+      ? d.getFirstSync(
+          "select count(*) as n from documents where fileUri is not null and (name like ? or originalName like ?)",
+          [`%${search}%`, `%${search}%`],
+        )
+      : d.getFirstSync("select count(*) as n from documents where fileUri is not null")
+  ) as { n: number } | null;
+  return row?.n ?? 0;
+}
+
 export function countCachedDocuments(search = ""): number {
   const d = getDb();
   const row = (

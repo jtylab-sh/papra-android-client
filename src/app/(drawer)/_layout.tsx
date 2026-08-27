@@ -44,6 +44,10 @@ export default function DrawerLayout() {
         }}
       />
       <Drawer.Screen
+        name="offline"
+        options={{ title: "Offline", drawerIcon: drawerIcon("cloud-check-outline") }}
+      />
+      <Drawer.Screen
         name="tags"
         options={{ title: "Tags", drawerIcon: drawerIcon("tag-multiple-outline") }}
       />
