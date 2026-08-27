@@ -1,6 +1,8 @@
 # Home-screen widget plan
 
-Android home-screen widgets for the Papra client, in value order. Not implemented yet.
+Android home-screen widgets for the Papra client, in value order.
+**Implemented: Scan to Papra + Recent documents** (react-native-android-widget 0.22.x).
+Search-bar and sync-status widgets remain on demand.
 
 ## How (one-time groundwork)
 

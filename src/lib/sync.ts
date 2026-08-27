@@ -19,6 +19,7 @@ import {
   clearCache,
 } from "./db";
 import { getSettings, isConnected, type Settings } from "./settings";
+import { updateRecentDocumentsWidget } from "../widgets/widgets";
 
 export const SYNC_TASK = "papra-sync";
 
@@ -61,6 +62,7 @@ export async function syncMetadata(settings?: Settings): Promise<string[]> {
     if (documents.length < pageSize || ids.length >= documentsCount) break;
   }
   for (const uri of pruneDocuments(ids)) safeDelete(uri);
+  updateRecentDocumentsWidget().catch(() => {});
   return ids;
 }
 

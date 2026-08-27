@@ -44,6 +44,33 @@
         }
       ],
       [
+        "react-native-android-widget",
+        {
+          "widgets": [
+            {
+              "name": "Scan",
+              "label": "Scan to Papra",
+              "description": "Open the document scanner",
+              "minWidth": "110dp",
+              "minHeight": "40dp",
+              "targetCellWidth": 2,
+              "targetCellHeight": 1
+            },
+            {
+              "name": "RecentDocuments",
+              "label": "Recent documents",
+              "description": "Latest documents from your Papra archive",
+              "minWidth": "180dp",
+              "minHeight": "110dp",
+              "targetCellWidth": 3,
+              "targetCellHeight": 2,
+              "resizeMode": "horizontal|vertical",
+              "updatePeriodMillis": 1800000
+            }
+          ]
+        }
+      ],
+      [
         "react-native-document-scanner-plugin",
         {
           "cameraPermission": "Papra uses the camera to scan documents."

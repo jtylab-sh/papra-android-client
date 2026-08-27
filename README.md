@@ -38,6 +38,9 @@ project.
   Wi-Fi-only option) using Android WorkManager; an Offline tab lists what's on the phone, offline
   documents are marked with a cloud icon, and copies can additionally be exported to a folder you
   pick (visible in your file manager).
+- **Home-screen widgets**: a *Scan to Papra* button that jumps straight into the scanner, and a
+  *Recent documents* list fed from the offline mirror (refreshed after every sync; rows open the
+  document).
 - **Biometric lock** (fingerprint / face) with a configurable grace period (default 5 min), an
   auto-opening prompt, and sign-out from the lock screen.
 
