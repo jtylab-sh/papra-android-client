@@ -23,6 +23,7 @@ import {
 import { getSettings, isConnected, type Settings } from "./settings";
 import { updateRecentDocumentsWidget } from "../widgets/widgets";
 import {
+  clearSyncNotification,
   notifyNewDocuments,
   notifySessionExpired,
   notifySyncFailures,
@@ -205,6 +206,7 @@ export async function syncNow(
   // when the user leaves the app. Never from background tasks — Android 12+
   // forbids starting a foreground service from the background.
   const useService = !opts.background && s.notifySyncProgress;
+  const plainProgress = Boolean(opts.background) && s.notifySyncProgress;
   if (useService) await startSyncService().catch(() => {});
   try {
     for (const id of ids) {
@@ -221,10 +223,11 @@ export async function syncNow(
       }
       await exportCopy(id, s.offlineExportDirUri);
       opts.onProgress?.(++done, ids.length);
-      if (useService) updateSyncProgress(done, ids.length).catch(() => {});
+      if (useService || plainProgress) updateSyncProgress(done, ids.length, useService).catch(() => {});
     }
   } finally {
     if (useService) await stopSyncService().catch(() => {});
+    if (plainProgress) await clearSyncNotification();
   }
   setMeta("lastSyncAt", new Date().toISOString());
   setMeta("lastSyncResult", JSON.stringify({ documents: ids.length, downloaded, failed, lastError }));

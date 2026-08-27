@@ -47,7 +47,7 @@ project.
 - **Notifications** (all opt-in, per-event toggles in Settings; permission asked on first enable):
   new documents found by background sync, repeated sync failures, session expired, a warning
   when trashed documents are within 3 days of permanent deletion, and a live sync-progress
-  notification.
+  notification (manual and scheduled background syncs).
 - **Sync survives leaving the app**: with the sync-progress notification enabled, a manual sync
   runs inside an Android foreground service (`dataSync`), so all documents keep downloading with a
   progress notification even when you switch apps.

@@ -379,7 +379,7 @@ export default function SettingsScreen() {
             [
               "notifySyncProgress",
               "Sync progress",
-              "Ongoing progress notification during a manual sync \u2014 also keeps the sync running when you leave the app",
+              "Ongoing progress notification while any sync runs \u2014 manual syncs also keep running when you leave the app",
             ],
           ] as const
         ).map(([key, label, desc]) => (

@@ -109,16 +109,27 @@ export async function startSyncService(): Promise<void> {
   });
 }
 
-export async function updateSyncProgress(done: number, total: number): Promise<void> {
+/**
+ * Progress update. asService=true rides the foreground service (manual syncs);
+ * asService=false is a plain ongoing notification — all a background
+ * WorkManager run may show (Android 12+ forbids starting a service from there).
+ */
+export async function updateSyncProgress(done: number, total: number, asService = true): Promise<void> {
   const now = Date.now();
   if (done < total && now - lastProgressAt < 1000) return; // at most 1 update/s
   lastProgressAt = now;
+  const { asForegroundService, foregroundServiceTypes, ...plain } = FGS_ANDROID;
   await notifee.displayNotification({
     id: SYNC_PROGRESS_ID,
     title: "Syncing documents",
     body: `${done} / ${total}`,
-    android: { ...FGS_ANDROID, progress: { max: total, current: done } },
+    android: { ...(asService ? FGS_ANDROID : plain), progress: { max: total, current: done } },
   });
+}
+
+/** Remove the plain progress notification after a background sync. */
+export async function clearSyncNotification(): Promise<void> {
+  await notifee.cancelNotification(SYNC_PROGRESS_ID).catch(() => {});
 }
 
 export async function stopSyncService(): Promise<void> {
