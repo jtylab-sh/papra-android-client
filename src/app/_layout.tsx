@@ -12,6 +12,7 @@ import { getAuthClient } from "../lib/auth";
 import { clearSettings, getSettings } from "../lib/settings";
 // Side effect: defines the background sync task at module scope.
 import { applySyncRegistration, wipeLocalData } from "../lib/sync";
+import { maybePromptUpdate } from "../lib/version";
 
 export default function RootLayout() {
   const appTheme = useAppTheme();
@@ -24,6 +25,11 @@ export default function RootLayout() {
       promptMessage: "Unlock Papra",
     });
     if (result.success) setLocked(false);
+  }, []);
+
+  // Once per new version: offer the newer GitHub release.
+  useEffect(() => {
+    maybePromptUpdate();
   }, []);
 
   // Auto-open the biometric prompt whenever the lock screen appears.
