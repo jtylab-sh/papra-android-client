@@ -46,7 +46,7 @@ export default function OfflineScreen() {
     <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
       <View style={{ padding: spacing.md, paddingBottom: 0 }}>
         <Searchbar
-          placeholder="Search offline documents"
+          placeholder="Search"
           value={search}
           onChangeText={onSearchChange}
           autoCapitalize="none"

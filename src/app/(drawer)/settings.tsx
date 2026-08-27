@@ -1,6 +1,6 @@
 import * as FileSystemLegacy from "expo-file-system/legacy";
 import * as LocalAuthentication from "expo-local-authentication";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { Alert, ScrollView, View } from "react-native";
 import {
@@ -30,6 +30,7 @@ import {
   wipeLocalData,
   wipeOfflineFiles,
 } from "../../lib/sync";
+import { appVersion } from "../../lib/version";
 
 const GRACE: { label: string; minutes: number }[] = [
   { label: "Immediately", minutes: 0 },
@@ -53,6 +54,11 @@ export default function SettingsScreen() {
   const [progress, setProgress] = useState<string>("");
   const [syncing, setSyncing] = useState(false);
   const lastSyncAt = getMeta("lastSyncAt");
+  const [counts, setCounts] = useState({ offline: 0, total: 0 });
+  const refreshCounts = useCallback(() => {
+    setCounts({ offline: countOfflineDocuments(), total: countCachedDocuments() });
+  }, []);
+  useFocusEffect(refreshCounts);
 
   useEffect(() => {
     getSettings().then((s) => {
@@ -149,14 +155,20 @@ export default function SettingsScreen() {
           {
             text: "Delete",
             style: "destructive",
-            onPress: () => {
-              wipeOfflineFiles(settings?.offlineExportDirUri ?? "").catch(() => {});
+            onPress: async () => {
+              try {
+                await wipeOfflineFiles(settings?.offlineExportDirUri ?? "");
+                refreshCounts();
+                Alert.alert("Deleted", "All offline copies were removed from this phone.");
+              } catch (e) {
+                Alert.alert("Delete failed", e instanceof Error ? e.message : String(e));
+              }
             },
           },
         ],
       );
     },
-    [update, settings?.offlineExportDirUri],
+    [update, settings?.offlineExportDirUri, refreshCounts],
   );
 
   const toggleNotification = useCallback(
@@ -196,8 +208,9 @@ export default function SettingsScreen() {
       setProgress(`Failed: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setSyncing(false);
+      refreshCounts();
     }
-  }, []);
+  }, [refreshCounts]);
 
   const pinWidget = useCallback(async (widgetName: "Scan" | "RecentDocuments") => {
     try {
@@ -243,7 +256,7 @@ export default function SettingsScreen() {
         <View style={{ marginTop: 8 }}>
           <KeyValue label="URL" value={settings.serverUrl} />
           <KeyValue label="Organization" value={settings.organizationName || settings.organizationId} />
-          <KeyValue label="Signed in as" value={settings.accountEmail || "\u2014"} />
+          <KeyValue label="Signed in as" value={settings.accountEmail || "unknown"} />
         </View>
         <View style={{ marginTop: spacing.sm }}>
           <Button label="Manage organizations" kind="ghost" onPress={openOrgDialog} />
@@ -351,7 +364,7 @@ export default function SettingsScreen() {
           <Button label="Sync now" kind="ghost" onPress={runSync} loading={syncing} />
           {progress ? <Muted>{progress}</Muted> : null}
           <Muted>
-            Offline: {countOfflineDocuments()} of {countCachedDocuments()} documents on this phone
+            Offline: {counts.offline} of {counts.total} documents on this phone
           </Muted>
           {lastSyncAt ? <Muted>Last sync: {new Date(lastSyncAt).toLocaleString()}</Muted> : null}
         </View>
@@ -394,7 +407,7 @@ export default function SettingsScreen() {
         <Text variant="titleMedium">Trash retention</Text>
         <Muted>
           Days your Papra server keeps trashed documents (its
-          deletedDocumentsRetentionDays). The app can't read it, so set it to match — this only
+          deletedDocumentsRetentionDays). The app can't read it, so set it to match; this only
           affects countdowns shown here, never the server.
         </Muted>
         <Row style={{ flexWrap: "wrap", marginTop: spacing.sm }}>
@@ -426,7 +439,7 @@ export default function SettingsScreen() {
             [
               "notifySyncProgress",
               "Sync progress",
-              "Ongoing progress notification while any sync runs \u2014 manual syncs also keep running when you leave the app",
+              "Ongoing progress notification while any sync runs; manual syncs also keep running when you leave the app",
             ],
           ] as const
         ).map(([key, label, desc]) => (
@@ -443,7 +456,7 @@ export default function SettingsScreen() {
       <Card>
         <Text variant="titleMedium">Home-screen widgets</Text>
         <Muted>
-          Adds the widget through the app — use this when your launcher's widget picker won't place
+          Adds the widget through the app. Use this when your launcher's widget picker won't place
           them.
         </Muted>
         <Row style={{ marginTop: spacing.sm }}>
@@ -457,6 +470,10 @@ export default function SettingsScreen() {
       </Card>
 
       <Button label="Sign out" kind="danger" onPress={signOut} />
+
+      <View style={{ alignItems: "center" }}>
+        <Muted>Papra Android v{appVersion()}</Muted>
+      </View>
     </ScrollView>
   );
 }

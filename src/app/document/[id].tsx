@@ -291,7 +291,7 @@ export default function DocumentScreen() {
           <List.Accordion title="Extracted text" left={(p) => <List.Icon {...p} icon="text-recognition" />}>
             <Text
               variant="bodySmall"
-              style={{ paddingHorizontal: spacing.md, paddingBottom: spacing.md, lineHeight: 19 }}
+              style={{ paddingTop: spacing.sm, paddingHorizontal: spacing.md, paddingBottom: spacing.md, lineHeight: 19 }}
               selectable
             >
               {live!.content}
@@ -302,7 +302,7 @@ export default function DocumentScreen() {
 
       <Card style={{ padding: 0, overflow: "hidden" }}>
         <List.Accordion title="Details" left={(p) => <List.Icon {...p} icon="information-outline" />}>
-          <View style={{ paddingHorizontal: spacing.md, paddingBottom: spacing.md }}>
+          <View style={{ paddingTop: spacing.sm, paddingHorizontal: spacing.md, paddingBottom: spacing.md }}>
             <KeyValue label="Original name" value={(doc.originalName as string) ?? ""} />
             <KeyValue label="Type" value={doc.mimeType ?? ""} />
             <KeyValue label="Size" value={formatBytes((doc.originalSize as number) ?? 0)} />

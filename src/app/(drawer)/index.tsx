@@ -167,7 +167,7 @@ export default function DocumentsScreen() {
   }, [viewName, search]);
 
   const confirmDeleteView = useCallback((view: PapraDocumentView) => {
-    Alert.alert("Delete view?", `"${view.name}" — the saved search is removed; documents are untouched.`, [
+    Alert.alert("Delete view?", `"${view.name}": the saved search is removed; documents are untouched.`, [
       { text: "Cancel", style: "cancel" },
       {
         text: "Delete",
@@ -258,7 +258,7 @@ export default function DocumentsScreen() {
       ) : null}
       <View style={{ padding: spacing.md, paddingBottom: 0 }}>
         <Searchbar
-          placeholder={'Search — tag:invoice, NOT draft, "phrase"'}
+          placeholder="Search"
           value={search}
           onChangeText={onSearchChange}
           autoCapitalize="none"

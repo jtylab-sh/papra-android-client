@@ -111,7 +111,7 @@ export default function UploadScreen() {
             </Text>
             <Text variant="bodySmall" style={{ color: statusColor[item.status], marginTop: 2 }}>
               {item.status}
-              {item.error ? ` — ${item.error}` : ""}
+              {item.error ? ` - ${item.error}` : ""}
             </Text>
           </Card>
         )}

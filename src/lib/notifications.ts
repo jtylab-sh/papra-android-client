@@ -62,7 +62,7 @@ export async function notifyNewDocuments(count: number, firstName: string): Prom
 
 export async function notifySyncFailures(streak: number): Promise<void> {
   if (!(await getSettings()).notifySyncFailures) return;
-  await post("alerts", "Background sync keeps failing", `${streak} runs in a row — open the app to check.`);
+  await post("alerts", "Background sync keeps failing", `${streak} runs in a row. Open the app to check.`);
 }
 
 export async function notifySessionExpired(): Promise<void> {

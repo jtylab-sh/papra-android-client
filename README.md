@@ -59,6 +59,8 @@ project.
   progress notification even when you switch apps.
 - **Biometric lock** (fingerprint / face) with a configurable grace period (default 5 min), an
   auto-opening prompt, and sign-out from the lock screen.
+- **Version + update check**: the app version shows at the bottom of Settings, and a popup (once
+  per version) offers new GitHub releases on start.
 
 ## Install
 
@@ -77,6 +79,9 @@ The APK is built for **arm64 (64-bit)** devices — any Android phone from rough
   from Google. Scanning itself runs on-device; documents are not uploaded anywhere except to your
   server when you press upload.
 - Notifications are generated locally on the phone (no push service involved).
+- One exception to server-only traffic: on start the app checks this repo's GitHub releases
+  (`api.github.com`) for a newer version. Plain unauthenticated GET, nothing sent beyond the
+  request itself.
 
 ## Server requirements
 
