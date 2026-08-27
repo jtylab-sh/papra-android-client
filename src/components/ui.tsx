@@ -1,9 +1,9 @@
 /** Tiny UI kit on top of react-native-paper — same API the screens already use. */
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import type { PropsWithChildren } from "react";
-import { StyleSheet, View, type ViewStyle } from "react-native";
+import { Pressable, StyleSheet, View, type ViewStyle } from "react-native";
 import {
   Button as PaperButton,
-  Chip,
   Surface,
   Text,
   TextInput,
@@ -77,18 +77,25 @@ export function Card({ children, style }: PropsWithChildren<{ style?: ViewStyle 
 export function TagChip({ name, color, onClose }: { name: string; color?: string; onClose?: () => void }) {
   const theme = useTheme<AppTheme>();
   // Tags carry a server-defined hex colour — keep it as the chip's own tint.
+  // Custom pill: Paper's Chip renders its close icon outside the outline in
+  // compact mode, so the ✕ sits inline here instead.
   const tint = color || theme.colors.primary;
   return (
-    <Chip
-      mode="outlined"
-      compact
-      onClose={onClose}
-      closeIconAccessibilityLabel={onClose ? `Remove ${name}` : undefined}
-      style={[styles.chip, { borderColor: tint }]}
-      textStyle={{ color: tint }}
-    >
-      {name}
-    </Chip>
+    <View style={[styles.chip, styles.tagPill, { borderColor: tint }]}>
+      <Text variant="labelMedium" numberOfLines={1} style={{ color: tint, flexShrink: 1 }}>
+        {name}
+      </Text>
+      {onClose ? (
+        <Pressable
+          onPress={onClose}
+          hitSlop={8}
+          accessibilityLabel={`Remove ${name}`}
+          style={{ marginLeft: 5 }}
+        >
+          <MaterialCommunityIcons name="close" size={14} color={tint} />
+        </Pressable>
+      ) : null}
+    </View>
   );
 }
 
@@ -126,7 +133,9 @@ export function formatBytes(n: number): string {
 export function formatDate(iso: string): string {
   if (!iso) return "";
   const d = new Date(iso);
-  return isNaN(d.getTime()) ? iso : d.toLocaleDateString() + " " + d.toLocaleTimeString().slice(0, 5);
+  return isNaN(d.getTime())
+    ? iso
+    : d.toLocaleDateString() + " " + d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
 const styles = StyleSheet.create({
@@ -134,6 +143,15 @@ const styles = StyleSheet.create({
   title: { marginBottom: spacing.md },
   card: { borderRadius: radius.lg, padding: spacing.md },
   chip: { marginRight: 6, marginBottom: 6 },
+  tagPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    alignSelf: "flex-start",
+  },
   row: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   kv: { marginBottom: spacing.sm },
   kvLabel: { textTransform: "uppercase", marginBottom: 2 },

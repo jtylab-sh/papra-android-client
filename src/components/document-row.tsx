@@ -50,8 +50,6 @@ export function MimeIcon({ mimeType, size = 40, checked = false }: { mimeType: s
   );
 }
 
-const MAX_TAGS = 2;
-
 export function DocumentRow({
   doc,
   selected = false,
@@ -64,8 +62,6 @@ export function DocumentRow({
   onLongPress?: () => void;
 }) {
   const theme = useTheme<AppTheme>();
-  const shown = doc.tags.slice(0, MAX_TAGS);
-  const extra = doc.tags.length - shown.length;
   return (
     <TouchableRipple
       onPress={onPress}
@@ -90,32 +86,33 @@ export function DocumentRow({
           <Text variant="titleSmall" numberOfLines={1}>
             {doc.name}
           </Text>
-          <View style={{ flexDirection: "row", alignItems: "center", marginTop: 2, gap: 6 }}>
-            <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
-              {formatDate(doc.createdAt)}
-              {doc.originalSize ? ` · ${formatBytes(doc.originalSize)}` : ""}
-            </Text>
-            {shown.map((t) => (
-              <View
-                key={t.id}
-                style={{
-                  borderWidth: 1,
-                  borderColor: t.color || theme.colors.outline,
-                  borderRadius: 8,
-                  paddingHorizontal: 5,
-                }}
-              >
-                <Text variant="labelSmall" numberOfLines={1} style={{ color: t.color || theme.colors.onSurfaceVariant }}>
-                  {t.name}
-                </Text>
-              </View>
-            ))}
-            {extra > 0 ? (
-              <Text variant="labelSmall" style={{ color: theme.colors.onSurfaceVariant }}>
-                +{extra}
-              </Text>
-            ) : null}
-          </View>
+          <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant, marginTop: 2 }}>
+            {formatDate(doc.createdAt)}
+            {doc.originalSize ? ` · ${formatBytes(doc.originalSize)}` : ""}
+          </Text>
+          {doc.tags.length > 0 ? (
+            <View style={{ flexDirection: "row", flexWrap: "wrap", marginTop: 3, gap: 4 }}>
+              {doc.tags.map((t) => (
+                <View
+                  key={t.id}
+                  style={{
+                    borderWidth: 1,
+                    borderColor: t.color || theme.colors.outline,
+                    borderRadius: 8,
+                    paddingHorizontal: 5,
+                  }}
+                >
+                  <Text
+                    variant="labelSmall"
+                    numberOfLines={1}
+                    style={{ color: t.color || theme.colors.onSurfaceVariant }}
+                  >
+                    {t.name}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
         </View>
         {doc.fileUri ? (
           <MaterialCommunityIcons name="cloud-check-outline" size={18} color={theme.colors.primary} />
