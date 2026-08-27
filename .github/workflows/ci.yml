@@ -114,12 +114,15 @@ jobs:
       # persists ~/.gradle/caches between runs).
       - name: Speed up native build
         run: |
-          # NO org.gradle.parallel: expo's autolinking runs a node exec per
-          # project at configuration time; parallel evaluation races them on
-          # shared mirror directories and node exits 1 (probe ran clean solo).
-          printf '%s\n' \
+          # Leading \n matters: the expo template ends gradle.properties without
+          # a trailing newline (its last line is expo.inlineModules.watchedDirectories=[]);
+          # appending without one merges into that property and breaks
+          # autolinking's JSON.parse (node exits 1 at configuration time).
+          printf '\n%s\n' \
             'reactNativeArchitectures=arm64-v8a' \
+            'org.gradle.parallel=true' \
             'org.gradle.caching=true' >> android/gradle.properties
+          tail -4 android/gradle.properties
       - name: Decode keystore
         env:
           KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
@@ -151,7 +154,7 @@ jobs:
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           set -o pipefail
-          cd android && ./gradlew --no-daemon --build-cache --stacktrace assembleRelease 2>&1 | tee /tmp/gradle.log
+          cd android && ./gradlew --no-daemon --build-cache --parallel --stacktrace assembleRelease 2>&1 | tee /tmp/gradle.log
       # Job logs are admin-only via the API. Publish the failure excerpt as a
       # commit comment (public, readable via the REST API) and in the step summary.
       - name: Surface gradle failure
