@@ -3,9 +3,20 @@ import * as IntentLauncher from "expo-intent-launcher";
 import * as Sharing from "expo-sharing";
 import { Stack, router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import { Alert, ScrollView, View } from "react-native";
-import { Button as PaperButton, Chip, Dialog, Portal, Text, useTheme } from "react-native-paper";
-import { Button, Card, KeyValue, Muted, TagChip, formatBytes, formatDate } from "../../components/ui";
+import { Alert, Image, ScrollView, View } from "react-native";
+import {
+  Button as PaperButton,
+  Chip,
+  Dialog,
+  IconButton,
+  List,
+  Portal,
+  Text,
+  TextInput,
+  useTheme,
+} from "react-native-paper";
+import { MimeIcon } from "../../components/document-row";
+import { Card, KeyValue, Muted, Row, TagChip, formatBytes, formatDate } from "../../components/ui";
 import { spacing, type AppTheme } from "../../constants/theme";
 import { getCachedDocument, upsertDocuments, type CachedDocument } from "../../lib/db";
 import {
@@ -13,6 +24,7 @@ import {
   getDocument,
   listTags,
   removeTagFromDocument,
+  renameDocument,
   trashDocument,
   type PapraCustomProperty,
   type PapraDocument,
@@ -79,6 +91,25 @@ export default function DocumentScreen() {
     },
     [id, reload],
   );
+
+  // --- inline rename (PATCH /documents/:id) ---
+  const [renameValue, setRenameValue] = useState<string | null>(null);
+  const [renaming, setRenaming] = useState(false);
+
+  const saveRename = useCallback(async () => {
+    const name = renameValue?.trim();
+    if (!name) return;
+    setRenaming(true);
+    try {
+      await renameDocument(id!, name);
+      setRenameValue(null);
+      reload();
+    } catch (e) {
+      Alert.alert("Failed", e instanceof Error ? e.message : String(e));
+    } finally {
+      setRenaming(false);
+    }
+  }, [id, renameValue, reload]);
 
   const withFile = useCallback(
     async (label: string, action: (uri: string, mime: string) => Promise<void>) => {
@@ -149,6 +180,7 @@ export default function DocumentScreen() {
   const customProperties = (live?.customProperties ?? [])
     .filter((prop) => prop.value !== null && prop.value !== undefined && prop.value !== "")
     .sort((a, b) => a.displayOrder - b.displayOrder);
+  const isImage = (doc.mimeType ?? "").startsWith("image/") && Boolean(cached?.fileUri);
 
   return (
     <ScrollView
@@ -156,17 +188,32 @@ export default function DocumentScreen() {
       contentContainerStyle={{ padding: spacing.md, gap: spacing.md }}
     >
       <Stack.Screen options={{ title: doc.name ?? "Document" }} />
-      <Card>
-        <KeyValue label="Name" value={doc.name ?? ""} />
-        <KeyValue label="Original name" value={(doc.originalName as string) ?? ""} />
-        <KeyValue label="Type" value={doc.mimeType ?? ""} />
-        <KeyValue label="Size" value={formatBytes((doc.originalSize as number) ?? 0)} />
-        <KeyValue label="Created" value={formatDate((doc.createdAt as string) ?? "")} />
-        <KeyValue label="Updated" value={formatDate((doc.updatedAt as string) ?? "")} />
-        <KeyValue label="SHA-256" value={(live?.originalSha256Hash as string) ?? cached?.sha256 ?? ""} />
-        <KeyValue label="Offline copy" value={cached?.fileUri ? "yes" : "no"} />
-        <KeyValue label="Id" value={doc.id ?? ""} />
-      </Card>
+      <View style={{ alignItems: "center", gap: spacing.sm }}>
+        {isImage ? (
+          <Image
+            source={{ uri: cached!.fileUri! }}
+            style={{ width: "100%", height: 220, borderRadius: 16 }}
+            resizeMode="cover"
+          />
+        ) : (
+          <MimeIcon mimeType={doc.mimeType ?? ""} size={64} />
+        )}
+        <Row style={{ justifyContent: "center" }}>
+          <Text variant="titleLarge" style={{ flexShrink: 1, textAlign: "center" }}>
+            {doc.name ?? ""}
+          </Text>
+          <IconButton icon="pencil-outline" size={18} onPress={() => setRenameValue(doc.name ?? "")} />
+        </Row>
+        <Muted>
+          {formatDate((doc.createdAt as string) ?? "")}
+          {doc.originalSize ? ` \u00b7 ${formatBytes(doc.originalSize as number)}` : ""}
+        </Muted>
+        <Row style={{ justifyContent: "center", gap: spacing.lg }}>
+          <ActionIcon icon="open-in-app" label="Open" onPress={open} busy={busy === "open"} />
+          <ActionIcon icon="share-variant-outline" label="Share" onPress={share} busy={busy === "share"} />
+          <ActionIcon icon="trash-can-outline" label="Trash" onPress={trash} danger />
+        </Row>
+      </View>
 
       <Card>
         <Muted>Tags</Muted>
@@ -207,6 +254,25 @@ export default function DocumentScreen() {
             <PaperButton onPress={() => setTagPicker(null)}>Close</PaperButton>
           </Dialog.Actions>
         </Dialog>
+        <Dialog visible={renameValue !== null} onDismiss={() => setRenameValue(null)}>
+          <Dialog.Title>Rename document</Dialog.Title>
+          <Dialog.Content>
+            <TextInput
+              mode="outlined"
+              dense
+              label="Name"
+              value={renameValue ?? ""}
+              onChangeText={setRenameValue}
+              autoFocus
+            />
+          </Dialog.Content>
+          <Dialog.Actions>
+            <PaperButton onPress={() => setRenameValue(null)}>Cancel</PaperButton>
+            <PaperButton mode="contained" loading={renaming} disabled={!renameValue?.trim()} onPress={saveRename}>
+              Save
+            </PaperButton>
+          </Dialog.Actions>
+        </Dialog>
       </Portal>
 
       {customProperties.length > 0 && (
@@ -221,19 +287,33 @@ export default function DocumentScreen() {
       )}
 
       {Boolean(live?.content) && (
-        <Card>
-          <Muted>Extracted content</Muted>
-          <Text variant="bodySmall" style={{ marginTop: 8, lineHeight: 19 }} selectable>
-            {live!.content}
-          </Text>
+        <Card style={{ padding: 0, overflow: "hidden" }}>
+          <List.Accordion title="Extracted text" left={(p) => <List.Icon {...p} icon="text-recognition" />}>
+            <Text
+              variant="bodySmall"
+              style={{ paddingHorizontal: spacing.md, paddingBottom: spacing.md, lineHeight: 19 }}
+              selectable
+            >
+              {live!.content}
+            </Text>
+          </List.Accordion>
         </Card>
       )}
 
-      <View style={{ gap: spacing.sm }}>
-        <Button label="Open" onPress={open} loading={busy === "open"} />
-        <Button label="Download / share" kind="ghost" onPress={share} loading={busy === "share"} />
-        <Button label="Move to trash" kind="danger" onPress={trash} />
-      </View>
+      <Card style={{ padding: 0, overflow: "hidden" }}>
+        <List.Accordion title="Details" left={(p) => <List.Icon {...p} icon="information-outline" />}>
+          <View style={{ paddingHorizontal: spacing.md, paddingBottom: spacing.md }}>
+            <KeyValue label="Original name" value={(doc.originalName as string) ?? ""} />
+            <KeyValue label="Type" value={doc.mimeType ?? ""} />
+            <KeyValue label="Size" value={formatBytes((doc.originalSize as number) ?? 0)} />
+            <KeyValue label="Created" value={formatDate((doc.createdAt as string) ?? "")} />
+            <KeyValue label="Updated" value={formatDate((doc.updatedAt as string) ?? "")} />
+            <KeyValue label="SHA-256" value={(live?.originalSha256Hash as string) ?? cached?.sha256 ?? ""} />
+            <KeyValue label="Offline copy" value={cached?.fileUri ? "yes" : "no"} />
+            <KeyValue label="Id" value={doc.id ?? ""} />
+          </View>
+        </List.Accordion>
+      </Card>
     </ScrollView>
   );
 }
@@ -250,4 +330,35 @@ function formatPropertyValue(prop: PapraCustomProperty): string {
   }
   if (typeof value === "object") return JSON.stringify(value);
   return String(value);
+}
+
+function ActionIcon({
+  icon,
+  label,
+  onPress,
+  busy,
+  danger,
+}: {
+  icon: string;
+  label: string;
+  onPress: () => void;
+  busy?: boolean;
+  danger?: boolean;
+}) {
+  const theme = useTheme<AppTheme>();
+  return (
+    <View style={{ alignItems: "center" }}>
+      <IconButton
+        icon={icon}
+        mode="contained-tonal"
+        size={26}
+        disabled={busy}
+        iconColor={danger ? theme.colors.error : undefined}
+        onPress={onPress}
+      />
+      <Text variant="labelSmall" style={{ color: danger ? theme.colors.error : theme.colors.onSurfaceVariant }}>
+        {label}
+      </Text>
+    </View>
+  );
 }

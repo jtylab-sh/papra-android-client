@@ -156,6 +156,11 @@ export async function getDocument(id: string): Promise<PapraDocument> {
   return json.document ?? (json as unknown as PapraDocument);
 }
 
+export async function renameDocument(id: string, name: string): Promise<void> {
+  const s = await getSettings();
+  await papraRequest(orgPath(s, `/documents/${id}`), { method: "PATCH", body: { name }, settings: s });
+}
+
 export async function trashDocument(id: string): Promise<void> {
   const s = await getSettings();
   await papraRequest(orgPath(s, `/documents/${id}`), { method: "DELETE", settings: s });

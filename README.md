@@ -31,7 +31,9 @@ project.
 - **Multi-select** (long press): batch move-to-trash and batch download-offline.
 - **Upload** via in-app file picker, the Android share sheet (share any file to Papra), or the built-in
   **document scanner** (ML Kit edge detection).
-- **Open / download / share** document files under their display name.
+- **Open / download / share** document files under their display name. The document page leads with
+  a preview (images) or type icon, name with inline **rename**, one-tap open/share/trash, and
+  collapsible extracted-text / details sections.
 - **Trash** like the web app: restore, delete forever, empty trash — every delete is confirmed with
   the 30-day retention notice, and trash rows show the time left until permanent deletion.
 - **Offline sync job**: optionally mirror every document to the phone on a schedule (15 min – 24 h,
