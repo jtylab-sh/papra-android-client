@@ -4,6 +4,7 @@ import { useShareIntent } from "expo-share-intent";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Alert, AppState } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { PaperProvider } from "react-native-paper";
 import { Button, Muted, Screen, Title } from "../components/ui";
 import { useAppTheme } from "../constants/theme";
@@ -91,7 +92,8 @@ export default function RootLayout() {
 
   // One provider around both branches: the lock screen is Paper-themed too.
   return (
-    <PaperProvider theme={appTheme}>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <PaperProvider theme={appTheme}>
       <StatusBar style="light" />
       {locked !== false ? (
         <Screen style={{ justifyContent: "center", gap: 12 }}>
@@ -112,8 +114,11 @@ export default function RootLayout() {
             headerTitleStyle: { color: appTheme.colors.onSurface },
             contentStyle: { backgroundColor: appTheme.colors.background },
           }}
-        />
+        >
+          <Stack.Screen name="(drawer)" options={{ headerShown: false }} />
+        </Stack>
       )}
-    </PaperProvider>
+      </PaperProvider>
+    </GestureHandlerRootView>
   );
 }

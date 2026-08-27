@@ -1,17 +1,16 @@
-import { Stack } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { Alert, FlatList, RefreshControl, View } from "react-native";
 import { Text, useTheme } from "react-native-paper";
-import { Button, Card, Muted, Row, formatDate } from "../components/ui";
-import { spacing, type AppTheme } from "../constants/theme";
+import { Button, Card, Muted, Row, formatDate } from "../../components/ui";
+import { spacing, type AppTheme } from "../../constants/theme";
 import {
   deleteDocumentForever,
   emptyTrash,
   listDeletedDocuments,
   restoreDocument,
   type PapraDocument,
-} from "../lib/papra";
-import { syncMetadata } from "../lib/sync";
+} from "../../lib/papra";
+import { syncMetadata } from "../../lib/sync";
 
 export default function TrashScreen() {
   const theme = useTheme<AppTheme>();
@@ -68,7 +67,6 @@ export default function TrashScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
-      <Stack.Screen options={{ title: "Trash" }} />
       {error ? (
         <View style={{ padding: spacing.md }}>
           <Muted>Trash needs the server: {error}</Muted>

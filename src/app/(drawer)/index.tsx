@@ -1,14 +1,14 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { Stack, router, useFocusEffect } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import { FlatList, RefreshControl, View } from "react-native";
 import { Card, IconButton, Text, useTheme } from "react-native-paper";
-import { Input, Muted, Row, TagChip, formatBytes, formatDate } from "../components/ui";
-import { spacing, type AppTheme } from "../constants/theme";
-import { listCachedDocuments, type CachedDocument } from "../lib/db";
-import { listDocuments } from "../lib/papra";
-import { getSettings, isConnected } from "../lib/settings";
-import { syncMetadata, upsertFromSearch } from "../lib/screens-helpers";
+import { Input, Muted, Row, TagChip, formatBytes, formatDate } from "../../components/ui";
+import { spacing, type AppTheme } from "../../constants/theme";
+import { listCachedDocuments, type CachedDocument } from "../../lib/db";
+import { listDocuments } from "../../lib/papra";
+import { getSettings, isConnected } from "../../lib/settings";
+import { syncMetadata, upsertFromSearch } from "../../lib/screens-helpers";
 
 export default function DocumentsScreen() {
   const theme = useTheme<AppTheme>();
@@ -75,22 +75,6 @@ export default function DocumentsScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
-      <Stack.Screen
-        options={{
-          title: "Documents",
-          headerRight: () => (
-            <Row style={{ gap: 0 }}>
-              <IconButton
-                icon="line-scan"
-                onPress={() => router.push({ pathname: "/upload", params: { mode: "scan" } })}
-              />
-              <IconButton icon="plus" onPress={() => router.push({ pathname: "/upload", params: { mode: "pick" } })} />
-              <IconButton icon="trash-can-outline" onPress={() => router.push("/trash")} />
-              <IconButton icon="cog-outline" onPress={() => router.push("/settings")} />
-            </Row>
-          ),
-        }}
-      />
       <View style={{ padding: spacing.md, paddingBottom: 0 }}>
         <Input
           placeholder="Search (submit to search server, incl. content)"

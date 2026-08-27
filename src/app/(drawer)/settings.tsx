@@ -1,14 +1,14 @@
 import * as LocalAuthentication from "expo-local-authentication";
-import { Stack, router } from "expo-router";
+import { router } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { Alert, ScrollView, View } from "react-native";
 import { Chip, Switch, Text, useTheme } from "react-native-paper";
-import { Button, Card, KeyValue, Muted, Row } from "../components/ui";
-import { spacing, type AppTheme } from "../constants/theme";
-import { getAuthClient } from "../lib/auth";
-import { getMeta } from "../lib/db";
-import { clearSettings, getSettings, saveSettings, type Settings } from "../lib/settings";
-import { applySyncRegistration, syncNow, wipeLocalData } from "../lib/sync";
+import { Button, Card, KeyValue, Muted, Row } from "../../components/ui";
+import { spacing, type AppTheme } from "../../constants/theme";
+import { getAuthClient } from "../../lib/auth";
+import { getMeta } from "../../lib/db";
+import { clearSettings, getSettings, saveSettings, type Settings } from "../../lib/settings";
+import { applySyncRegistration, syncNow, wipeLocalData } from "../../lib/sync";
 
 const GRACE: { label: string; minutes: number }[] = [
   { label: "Immediately", minutes: 0 },
@@ -108,7 +108,6 @@ export default function SettingsScreen() {
       style={{ flex: 1, backgroundColor: theme.colors.background }}
       contentContainerStyle={{ padding: spacing.md, gap: spacing.md }}
     >
-      <Stack.Screen options={{ title: "Settings" }} />
 
       <Card>
         <Muted>Server</Muted>
