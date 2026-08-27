@@ -137,10 +137,11 @@ export default function SignInScreen() {
               autoCapitalize="none"
               autoCorrect={false}
               keyboardType="email-address"
+              autoComplete="email"
               value={email}
               onChangeText={setEmail}
             />
-            <Input placeholder="Password" secureTextEntry value={password} onChangeText={setPassword} />
+            <Input placeholder="Password" secureTextEntry autoComplete="current-password" value={password} onChangeText={setPassword} />
             {error ? <Text style={{ color: colors.danger }}>{error}</Text> : null}
             <Button label="Sign in" onPress={connect} loading={busy} />
           </>
@@ -149,7 +150,9 @@ export default function SignInScreen() {
             <Muted>Two-factor authentication — enter the 6-digit code from your authenticator app.</Muted>
             <Input
               placeholder="123456"
-              keyboardType="number-pad"
+              autoComplete="one-time-code"
+              autoCapitalize="none"
+              autoCorrect={false}
               maxLength={6}
               value={code}
               onChangeText={setCode}
