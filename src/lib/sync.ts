@@ -19,6 +19,7 @@ import {
   setMeta,
   upsertDocuments,
   clearCache,
+  clearFileUris,
 } from "./db";
 import { getSettings, isConnected, type Settings } from "./settings";
 import { updateRecentDocumentsWidget } from "../widgets/widgets";
@@ -110,8 +111,29 @@ function displayFileName(cached: { name: string; mimeType: string }): string {
  * ponytail: base64 round-trip through the legacy FS API — the only way to
  * write SAF content:// URIs; fine for scanned documents, slow for huge files.
  */
+/**
+ * Keep the export folder out of the phone's gallery: a `.nomedia` file makes
+ * Android's media scanner skip the directory. Written once per folder.
+ */
+export async function ensureNoMedia(exportDirUri: string): Promise<void> {
+  if (!exportDirUri) return;
+  const key = `nomedia:${exportDirUri}`;
+  if (getMeta(key)) return;
+  try {
+    await FileSystemLegacy.StorageAccessFramework.createFileAsync(
+      exportDirUri,
+      ".nomedia",
+      "application/octet-stream",
+    );
+  } catch {
+    /* exists already */
+  }
+  setMeta(key, "1");
+}
+
 async function exportCopy(id: string, exportDirUri: string): Promise<void> {
   if (!exportDirUri) return;
+  await ensureNoMedia(exportDirUri);
   const cached = getCachedDocument(id);
   if (!cached?.fileUri) return;
   const metaKey = `exported:${id}`;
@@ -283,6 +305,39 @@ export async function applySyncRegistration(): Promise<void> {
     await BackgroundTask.registerTaskAsync(SYNC_TASK, { minimumInterval: s.syncIntervalMinutes });
   } else {
     await BackgroundTask.unregisterTaskAsync(SYNC_TASK).catch(() => {});
+  }
+}
+
+/**
+ * Delete every offline copy (blobs + pointers + exported folder copies) but
+ * keep the metadata mirror. Offered when the user turns offline sync off.
+ * Only files matching our documents' export names are removed from the
+ * user-picked folder — anything else in there is untouched.
+ */
+export async function wipeOfflineFiles(exportDirUri: string): Promise<void> {
+  if (exportDirUri) {
+    try {
+      const expected = new Set(
+        listCachedDocuments()
+          .filter((d) => d.fileUri)
+          .map((d) => displayFileName(d)),
+      );
+      const entries = await FileSystemLegacy.StorageAccessFramework.readDirectoryAsync(exportDirUri);
+      for (const uri of entries) {
+        const name = decodeURIComponent(uri.split("%2F").pop() ?? "");
+        if (expected.has(name)) {
+          await FileSystemLegacy.deleteAsync(uri, { idempotent: true }).catch(() => {});
+        }
+      }
+    } catch {
+      /* folder revoked — blobs still wiped below */
+    }
+  }
+  for (const uri of clearFileUris()) safeDelete(uri);
+  try {
+    docsDir().delete();
+  } catch {
+    /* fine */
   }
 }
 

@@ -187,6 +187,15 @@ export function setMeta(key: string, value: string): void {
   ]);
 }
 
+/** Drop every fileUri pointer + exported markers; caller deletes the blobs. */
+export function clearFileUris(): string[] {
+  const d = getDb();
+  const rows = d.getAllSync("select fileUri from documents where fileUri is not null") as { fileUri: string }[];
+  d.runSync("update documents set fileUri = null");
+  d.runSync("delete from meta where key like 'exported:%'");
+  return rows.map((r) => r.fileUri);
+}
+
 /** Wipe everything (server switch / sign-out). */
 export function clearCache(): string[] {
   const d = getDb();

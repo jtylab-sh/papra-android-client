@@ -40,7 +40,9 @@ project.
   Wi-Fi-only option) using Android WorkManager; an Offline tab lists what's on the phone, offline
   documents are marked with a cloud icon, the Documents list can filter to not-yet-synced documents,
   Settings shows how many documents are offline vs on the server, and copies can additionally be
-  exported to a folder you pick (visible in your file manager).
+  exported to a folder you pick (visible in your file manager; the folder gets a `.nomedia` marker so
+  synced images don't flood the phone's gallery). Turning sync off offers to delete all offline
+  copies from the phone.
 - **Organizations**: switch between your Papra organizations or create a new one from Settings —
   each organization keeps its own offline mirror on the phone, so switching is instant and loses
   nothing.

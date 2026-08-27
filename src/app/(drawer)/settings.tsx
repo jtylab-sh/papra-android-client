@@ -21,7 +21,14 @@ import { requestNotificationPermission } from "../../lib/notifications";
 import { createOrganization, listOrganizations, type PapraOrganization } from "../../lib/papra";
 import { countCachedDocuments, countOfflineDocuments, getMeta } from "../../lib/db";
 import { clearSettings, getSettings, saveSettings, type Settings } from "../../lib/settings";
-import { applySyncRegistration, syncMetadata, syncNow, wipeLocalData } from "../../lib/sync";
+import {
+  applySyncRegistration,
+  ensureNoMedia,
+  syncMetadata,
+  syncNow,
+  wipeLocalData,
+  wipeOfflineFiles,
+} from "../../lib/sync";
 
 const GRACE: { label: string; minutes: number }[] = [
   { label: "Immediately", minutes: 0 },
@@ -126,6 +133,30 @@ export default function SettingsScreen() {
       setOrgBusy(false);
     }
   }, [newOrgName, orgs]);
+
+  const toggleSync = useCallback(
+    (v: boolean) => {
+      update({ syncEnabled: v }, true);
+      if (v) return;
+      const n = countOfflineDocuments();
+      if (n === 0) return;
+      Alert.alert(
+        "Delete offline files?",
+        `Sync is off. Also delete the ${n} offline copies on this phone (and their exported folder copies)? Documents on the server are not touched.`,
+        [
+          { text: "Keep files", style: "cancel" },
+          {
+            text: "Delete",
+            style: "destructive",
+            onPress: () => {
+              wipeOfflineFiles(settings?.offlineExportDirUri ?? "").catch(() => {});
+            },
+          },
+        ],
+      );
+    },
+    [update, settings?.offlineExportDirUri],
+  );
 
   const toggleNotification = useCallback(
     async (
@@ -247,7 +278,7 @@ export default function SettingsScreen() {
       <Card>
         <Row style={{ justifyContent: "space-between" }}>
           <Text variant="titleMedium">Offline sync</Text>
-          <Switch value={settings.syncEnabled} onValueChange={(v: boolean) => update({ syncEnabled: v }, true)} />
+          <Switch value={settings.syncEnabled} onValueChange={toggleSync} />
         </Row>
         <Muted>Mirrors every document to this phone in the background.</Muted>
 
@@ -296,7 +327,10 @@ export default function SettingsScreen() {
                     return;
                   }
                   const perm = await FileSystemLegacy.StorageAccessFramework.requestDirectoryPermissionsAsync();
-                  if (perm.granted) update({ offlineExportDirUri: perm.directoryUri });
+                  if (perm.granted) {
+                    update({ offlineExportDirUri: perm.directoryUri });
+                    ensureNoMedia(perm.directoryUri).catch(() => {});
+                  }
                 }}
               />
             </Row>
