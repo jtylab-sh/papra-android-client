@@ -216,6 +216,30 @@ export default function SettingsScreen() {
         )}
       </Card>
 
+      <Card>
+        <Text variant="titleMedium">Trash retention</Text>
+        <Muted>
+          Days your Papra server keeps trashed documents (its
+          deletedDocumentsRetentionDays). The app can't read it, so set it to match — this only
+          affects countdowns shown here, never the server.
+        </Muted>
+        <Row style={{ flexWrap: "wrap", marginTop: spacing.sm }}>
+          {[7, 14, 30, 60, 90].map((days) => (
+            <Chip
+              key={days}
+              compact
+              selected={settings.trashRetentionDays === days}
+              showSelectedCheck={false}
+              mode={settings.trashRetentionDays === days ? "flat" : "outlined"}
+              onPress={() => update({ trashRetentionDays: days })}
+              style={{ marginRight: 6, marginBottom: 6 }}
+            >
+              {`${days} days`}
+            </Chip>
+          ))}
+        </Row>
+      </Card>
+
       <Button label="Sign out" kind="danger" onPress={signOut} />
     </ScrollView>
   );

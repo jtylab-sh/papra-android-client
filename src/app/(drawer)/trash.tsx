@@ -10,13 +10,12 @@ import {
   restoreDocument,
   type PapraDocument,
 } from "../../lib/papra";
+import { getSettings } from "../../lib/settings";
 import { syncMetadata } from "../../lib/sync";
 
-const RETENTION_DAYS = 30; // Papra server default (deletedDocumentsRetentionDays); not exposed via API
-
-function retentionSuffix(deletedAt: string | null | undefined) {
+function retentionSuffix(deletedAt: string | null | undefined, retentionDays: number) {
   if (!deletedAt) return "";
-  const purgeAt = new Date(deletedAt).getTime() + RETENTION_DAYS * 24 * 60 * 60 * 1000;
+  const purgeAt = new Date(deletedAt).getTime() + retentionDays * 24 * 60 * 60 * 1000;
   const daysLeft = Math.ceil((purgeAt - Date.now()) / (24 * 60 * 60 * 1000));
   return daysLeft <= 0 ? " · purge imminent" : ` · gone in ${daysLeft} day${daysLeft === 1 ? "" : "s"}`;
 }
@@ -26,6 +25,12 @@ export default function TrashScreen() {
   const [docs, setDocs] = useState<PapraDocument[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
+  // Mirrors the server's retention config (Settings); display-only.
+  const [retentionDays, setRetentionDays] = useState(30);
+
+  useEffect(() => {
+    getSettings().then((s) => setRetentionDays(s.trashRetentionDays));
+  }, []);
 
   const load = useCallback(async () => {
     setRefreshing(true);
@@ -65,7 +70,7 @@ export default function TrashScreen() {
   const confirmEmpty = () =>
     Alert.alert(
       "Empty trash?",
-      `All ${docs.length} trashed document${docs.length === 1 ? "" : "s"} are deleted forever. Documents otherwise auto-delete after ${RETENTION_DAYS} days.`,
+      `All ${docs.length} trashed document${docs.length === 1 ? "" : "s"} are deleted forever. Documents otherwise auto-delete after ${retentionDays} days.`,
       [
         { text: "Cancel", style: "cancel" },
         { text: "Empty trash", style: "destructive", onPress: () => act(emptyTrash) },
@@ -75,7 +80,7 @@ export default function TrashScreen() {
   const confirmDeleteForever = (doc: PapraDocument) =>
     Alert.alert(
       "Delete forever?",
-      `${doc.name}\n\nThis is permanent and cannot be undone. Documents otherwise auto-delete after ${RETENTION_DAYS} days.`,
+      `${doc.name}\n\nThis is permanent and cannot be undone. Documents otherwise auto-delete after ${retentionDays} days.`,
       [
         { text: "Cancel", style: "cancel" },
         { text: "Delete", style: "destructive", onPress: () => act(() => deleteDocumentForever(doc.id)) },
@@ -109,7 +114,7 @@ export default function TrashScreen() {
             </Text>
             <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant, marginVertical: 6 }}>
               deleted {formatDate(item.deletedAt ?? "")}
-              {retentionSuffix(item.deletedAt)}
+              {retentionSuffix(item.deletedAt, retentionDays)}
             </Text>
             <Row>
               <View style={{ flex: 1 }}>

@@ -21,6 +21,11 @@ export interface Settings {
   lockGraceMinutes: number;
   /** SAF tree URI; when set, offline copies are also exported there ("" = off) */
   offlineExportDirUri: string;
+  /**
+   * Mirror of the server's deletedDocumentsRetentionDays (not readable via the
+   * API). Only affects countdowns shown in this app — never the server.
+   */
+  trashRetentionDays: number;
 }
 
 const DEFAULTS: Settings = {
@@ -35,6 +40,7 @@ const DEFAULTS: Settings = {
   biometricLock: false,
   lockGraceMinutes: 5,
   offlineExportDirUri: "",
+  trashRetentionDays: 30,
 };
 
 const KEY = "papra.settings";

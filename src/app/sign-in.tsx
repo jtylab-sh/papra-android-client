@@ -23,6 +23,7 @@ function draftSettings(serverUrl: string): Settings {
     biometricLock: false,
     lockGraceMinutes: 5,
     offlineExportDirUri: "",
+    trashRetentionDays: 30,
   };
 }
 
