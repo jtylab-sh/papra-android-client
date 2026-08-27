@@ -44,6 +44,13 @@
         }
       ],
       [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/android-icon-monochrome.png",
+          "color": "#10b981"
+        }
+      ],
+      [
         "react-native-android-widget",
         {
           "widgets": [

@@ -1,5 +1,10 @@
 # Notification plan
 
+**Status: implemented** (src/lib/notifications.ts) — per-event opt-in toggles in
+Settings, permission requested on first enable, events fired from background
+syncs only. Not implemented: transfer progress bars (needs a foreground
+service; on demand).
+
 All notifications are **local** (scheduled/shown by the app itself via
 `expo-notifications`). Real push would require FCM plus a server-side webhook
 sender that Papra does not ship — out of scope for a self-hosted client.

@@ -26,6 +26,11 @@ export interface Settings {
    * API). Only affects countdowns shown in this app — never the server.
    */
   trashRetentionDays: number;
+  /** notification toggles — all opt-in; enabling the first one asks for permission */
+  notifyNewDocuments: boolean;
+  notifySyncFailures: boolean;
+  notifySessionExpired: boolean;
+  notifyTrashPurge: boolean;
 }
 
 const DEFAULTS: Settings = {
@@ -41,6 +46,10 @@ const DEFAULTS: Settings = {
   lockGraceMinutes: 5,
   offlineExportDirUri: "",
   trashRetentionDays: 30,
+  notifyNewDocuments: false,
+  notifySyncFailures: false,
+  notifySessionExpired: false,
+  notifyTrashPurge: false,
 };
 
 const KEY = "papra.settings";

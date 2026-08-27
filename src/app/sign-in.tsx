@@ -24,6 +24,10 @@ function draftSettings(serverUrl: string): Settings {
     lockGraceMinutes: 5,
     offlineExportDirUri: "",
     trashRetentionDays: 30,
+    notifyNewDocuments: false,
+    notifySyncFailures: false,
+    notifySessionExpired: false,
+    notifyTrashPurge: false,
   };
 }
 

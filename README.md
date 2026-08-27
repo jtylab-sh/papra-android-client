@@ -43,6 +43,9 @@ project.
 - **Home-screen widgets**: a *Scan to Papra* button that jumps straight into the scanner, and a
   *Recent documents* list fed from the offline mirror (refreshed after every sync; rows open the
   document).
+- **Notifications** (all opt-in, per-event toggles in Settings; permission asked on first enable):
+  new documents found by background sync, repeated sync failures, session expired, and a warning
+  when trashed documents are within 3 days of permanent deletion.
 - **Biometric lock** (fingerprint / face) with a configurable grace period (default 5 min), an
   auto-opening prompt, and sign-out from the lock screen.
 

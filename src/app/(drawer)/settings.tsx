@@ -17,6 +17,7 @@ import {
 import { Button, Card, KeyValue, Muted, Row } from "../../components/ui";
 import { spacing, type AppTheme } from "../../constants/theme";
 import { getAuthClient } from "../../lib/auth";
+import { requestNotificationPermission } from "../../lib/notifications";
 import { createOrganization, listOrganizations, type PapraOrganization } from "../../lib/papra";
 import { getMeta } from "../../lib/db";
 import { clearSettings, getSettings, saveSettings, type Settings } from "../../lib/settings";
@@ -125,6 +126,17 @@ export default function SettingsScreen() {
       setOrgBusy(false);
     }
   }, [newOrgName, orgs]);
+
+  const toggleNotification = useCallback(
+    async (key: "notifyNewDocuments" | "notifySyncFailures" | "notifySessionExpired" | "notifyTrashPurge", value: boolean) => {
+      if (value && !(await requestNotificationPermission())) {
+        Alert.alert("No permission", "Allow notifications for Papra in Android settings first.");
+        return;
+      }
+      update({ [key]: value });
+    },
+    [update],
+  );
 
   const runSync = useCallback(async () => {
     setSyncing(true);
@@ -341,6 +353,27 @@ export default function SettingsScreen() {
             </Chip>
           ))}
         </Row>
+      </Card>
+
+      <Card>
+        <Text variant="titleMedium">Notifications</Text>
+        <Muted>All from background syncs only; permission is asked on first enable.</Muted>
+        {(
+          [
+            ["notifyNewDocuments", "New documents", "When a background sync finds documents new to this phone"],
+            ["notifySyncFailures", "Sync failures", "After 3 failed background syncs in a row"],
+            ["notifySessionExpired", "Session expired", "When the server wants you to sign in again"],
+            ["notifyTrashPurge", "Trash purge warning", "When trashed documents are within 3 days of permanent deletion"],
+          ] as const
+        ).map(([key, label, desc]) => (
+          <Row key={key} style={{ justifyContent: "space-between", marginTop: spacing.sm }}>
+            <View style={{ flex: 1 }}>
+              <Text variant="bodyLarge">{label}</Text>
+              <Muted>{desc}</Muted>
+            </View>
+            <Switch value={settings[key]} onValueChange={(v: boolean) => toggleNotification(key, v)} />
+          </Row>
+        ))}
       </Card>
 
       <Button label="Sign out" kind="danger" onPress={signOut} />

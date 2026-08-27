@@ -8,10 +8,11 @@ import { Directory, File, Paths } from "expo-file-system";
 import * as FileSystemLegacy from "expo-file-system/legacy";
 import * as Network from "expo-network";
 import * as TaskManager from "expo-task-manager";
-import { listDocuments, documentFileUrl, type PapraDocument } from "./papra";
+import { ApiError, listDeletedDocuments, listDocuments, documentFileUrl, type PapraDocument } from "./papra";
 import {
   getCachedDocument,
   getMeta,
+  listCachedDocuments,
   pruneDocuments,
   setDocumentFileUri,
   setMeta,
@@ -20,6 +21,12 @@ import {
 } from "./db";
 import { getSettings, isConnected, type Settings } from "./settings";
 import { updateRecentDocumentsWidget } from "../widgets/widgets";
+import {
+  notifyNewDocuments,
+  notifySessionExpired,
+  notifySyncFailures,
+  notifyTrashPurge,
+} from "./notifications";
 
 export const SYNC_TASK = "papra-sync";
 
@@ -148,7 +155,14 @@ export interface SyncResult {
   failed: number;
 }
 
-export async function syncNow(opts: { respectWifiOnly?: boolean; onProgress?: (done: number, total: number) => void } = {}): Promise<SyncResult> {
+export async function syncNow(
+  opts: {
+    respectWifiOnly?: boolean;
+    onProgress?: (done: number, total: number) => void;
+    /** background runs may notify; foreground runs never do (user sees the UI) */
+    background?: boolean;
+  } = {},
+): Promise<SyncResult> {
   const s = await getSettings();
   if (!isConnected(s)) return { skipped: "not-configured", documents: 0, downloaded: 0, failed: 0 };
   if (opts.respectWifiOnly && s.syncWifiOnly) {
@@ -157,7 +171,16 @@ export async function syncNow(opts: { respectWifiOnly?: boolean; onProgress?: (d
       return { skipped: "wifi", documents: 0, downloaded: 0, failed: 0 };
     }
   }
+  const knownIds = opts.background ? new Set(listCachedDocuments().map((d) => d.id)) : null;
   const ids = await syncMetadata(s);
+  if (opts.background && knownIds && knownIds.size > 0) {
+    const fresh = ids.filter((docId) => !knownIds.has(docId));
+    if (fresh.length > 0) {
+      const first = getCachedDocument(fresh[0])?.name ?? "";
+      notifyNewDocuments(fresh.length, first).catch(() => {});
+    }
+  }
+  if (opts.background) await checkTrashPurge(s.trashRetentionDays).catch(() => {});
   let downloaded = 0;
   let failed = 0;
   let done = 0;
@@ -180,14 +203,44 @@ export async function syncNow(opts: { respectWifiOnly?: boolean; onProgress?: (d
   return { documents: ids.length, downloaded, failed };
 }
 
+/**
+ * Warn (channel `alerts`, at most once a day) when trashed documents are close
+ * to the server's permanent purge. Retention mirrors the Settings value.
+ */
+const PURGE_WARN_DAYS = 3;
+
+async function checkTrashPurge(retentionDays: number): Promise<void> {
+  const today = new Date().toISOString().slice(0, 10);
+  if (getMeta("lastPurgeWarnDay") === today) return;
+  const { documents } = await listDeletedDocuments({ pageIndex: 0 });
+  const day = 24 * 60 * 60 * 1000;
+  const soon = documents.filter((d) => {
+    if (!d.deletedAt) return false;
+    const daysLeft = (new Date(d.deletedAt).getTime() + retentionDays * day - Date.now()) / day;
+    return daysLeft <= PURGE_WARN_DAYS;
+  });
+  if (soon.length > 0) {
+    await notifyTrashPurge(soon.length, PURGE_WARN_DAYS);
+    setMeta("lastPurgeWarnDay", today);
+  }
+}
+
 // Must be defined at module scope so the background task can run headlessly.
 TaskManager.defineTask(SYNC_TASK, async () => {
   try {
     const s = await getSettings();
     if (!s.syncEnabled) return BackgroundTask.BackgroundTaskResult.Success;
-    await syncNow({ respectWifiOnly: true });
+    await syncNow({ respectWifiOnly: true, background: true });
+    setMeta("syncFailStreak", "0");
     return BackgroundTask.BackgroundTaskResult.Success;
-  } catch {
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 401) {
+      notifySessionExpired().catch(() => {});
+    } else {
+      const streak = Number(getMeta("syncFailStreak") ?? "0") + 1;
+      setMeta("syncFailStreak", String(streak));
+      if (streak === 3) notifySyncFailures(streak).catch(() => {});
+    }
     return BackgroundTask.BackgroundTaskResult.Failed;
   }
 });
