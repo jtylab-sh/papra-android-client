@@ -213,7 +213,14 @@ export default function SettingsScreen() {
   const pinWidget = useCallback(async (widgetName: "Scan" | "RecentDocuments") => {
     try {
       const accepted = await requestPinWidget({ widgetName });
-      if (!accepted) Alert.alert("Not supported", "This launcher does not allow apps to pin widgets.");
+      // true only means the launcher accepted the request; Android never
+      // reports whether it actually placed the widget.
+      Alert.alert(
+        accepted ? "Request sent" : "Not supported",
+        accepted
+          ? "If nothing appeared on the home screen, the launcher blocked it. On Xiaomi, Redmi or POCO phones: Security app, Manage apps, Papra, Other permissions, allow Home screen shortcuts, then try again."
+          : "This launcher does not allow apps to pin widgets. Add it from the launcher's own widget picker instead.",
+      );
     } catch (e) {
       Alert.alert("Failed", e instanceof Error ? e.message : String(e));
     }

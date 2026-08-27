@@ -1,3 +1,4 @@
+"use no memo"; // React Compiler memoization breaks widget rendering (react-native-android-widget #126)
 /**
  * Home-screen widgets (react-native-android-widget). Rendered to RemoteViews —
  * no JS runtime on the home screen, so everything here must be pure/presentational.
