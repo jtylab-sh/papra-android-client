@@ -10,21 +10,27 @@ full offline copy on your phone. Not affiliated with the Papra project.
 ## Features
 
 - Works with any self-hosted Papra instance. Sign in with email and password; two-factor (TOTP)
-  accounts work and the device is remembered after the first code. Settings shows the server
-  version next to your account.
+  accounts work, with an optional "trust this device" checkbox that skips the code on later
+  sign-ins. Settings shows the server version next to your account.
 - Material You: on Android 12+ the colors follow your wallpaper, and there is a themed app icon.
 - Browse and search documents using Papra's real query grammar (`AND`/`OR`/`NOT`, `"quoted
   phrases"`, `tag:`, `name:`, `content:`, `created:`, `has:`), with results streaming in as you
-  type. Offline, search falls back to local names.
+  type. Offline, search falls back to local names and tags.
 - Saved views, shared with the web UI: save a search from the bookmark icon, run it from a chip,
   long-press to delete.
 - Manage tags and custom properties (all types, select options included), and edit text, number,
-  date and yes/no property values right on the document page.
+  date and yes/no property values right on the document page. Tapping a tag searches for it.
 - Multi-select with select all, batch tag/untag, share, print, trash and download. Swipe a row
   right to download it, left to trash it. Sort by date, name or last update.
-- Upload from the file picker, the Android share sheet, or the built-in document scanner.
-- Open, share and print documents under their real names, rename inline, and view images with
-  pinch-zoom.
+- Upload from the file picker, the Android share sheet, or the built-in document scanner. Files
+  can be renamed before they go up.
+- Scans become a single PDF, however many pages you capture, and you pick the name right after
+  scanning. Papra runs OCR on scanned PDFs, so they stay searchable.
+- Reliable uploads: a progress notification shows each file, uploads keep running when you switch
+  apps, and anything that cannot be sent (offline, server unreachable) waits in a queue that
+  retries by itself. The queue page lets you retry now or remove entries.
+- Open, share and print documents under their real names, rename inline, view images with
+  pinch-zoom, copy the extracted text, or jump to the document in the web UI.
 - Trash with restore, delete forever and empty trash; rows show the time left before permanent
   deletion.
 - Offline mirror: sync every document on a schedule (15 min to 24 h, Wi-Fi-only option). Syncs are
@@ -32,15 +38,19 @@ full offline copy on your phone. Not affiliated with the Papra project.
   added mid-sync, and manual syncs keep running in a foreground service when you switch apps.
   Copies can also be exported to a folder of your choice, browsable in any file manager and kept
   out of the photo gallery. Each document page has its own download / remove-offline toggle.
-- Home page with quick Scan/Upload actions, organization statistics and the most recent documents.
+- Home is the start page: quick Scan/Upload actions, organization statistics and the most recent
+  documents. Long-pressing the app icon offers Scan, Upload and Search shortcuts.
 - Offline awareness: a banner while there is no connectivity, a small toast when an action needs
   the server, and every page refreshes by itself once you are back online.
 - Home-screen widgets: a Scan button and a Recent documents list. Add them from the widget picker
   or from Settings.
 - Opt-in notifications: new documents, repeated sync failures, session expired, trash purge
-  warning, and live sync progress. Tapping one opens the matching page.
+  warning, and live sync and upload progress. Tapping one opens the matching page.
 - Organizations: switch or create from Settings; each keeps its own offline mirror.
-- Biometric lock with a configurable grace period.
+- Private by design on the device too: biometric lock with a configurable grace period
+  (screenshots are blocked only while locked), the app is excluded from Google's device backup,
+  and the session is stored per server and fully removed on sign-out. App settings survive
+  sign-out; documents do not.
 - Configurable date format (system, DD/MM/YYYY, MM/DD/YYYY, YYYY-MM-DD).
 - Optional update check (off by default) that downloads new releases and opens the installer
   directly.
