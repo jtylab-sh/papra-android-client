@@ -244,8 +244,9 @@ export default function SettingsScreen() {
                   compact
                   showSelectedCheck={false}
                   selected={settings.syncIntervalMinutes === opt.minutes}
+                  mode={settings.syncIntervalMinutes === opt.minutes ? "flat" : "outlined"}
                   onPress={() => update({ syncIntervalMinutes: opt.minutes }, true)}
-                  style={{ marginBottom: 6 }}
+                  style={{ marginRight: 6, marginBottom: 6 }}
                 >
                   {opt.label}
                 </Chip>
@@ -308,8 +309,9 @@ export default function SettingsScreen() {
                   compact
                   showSelectedCheck={false}
                   selected={settings.lockGraceMinutes === opt.minutes}
+                  mode={settings.lockGraceMinutes === opt.minutes ? "flat" : "outlined"}
                   onPress={() => update({ lockGraceMinutes: opt.minutes })}
-                  style={{ marginBottom: 6 }}
+                  style={{ marginRight: 6, marginBottom: 6 }}
                 >
                   {opt.label}
                 </Chip>
