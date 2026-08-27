@@ -28,8 +28,7 @@ jobs:
   version:
     # Computes the next version from the conventional-commit subjects since the
     # last tag: `type!:` or a `BREAKING CHANGE:` footer is major, `feat:` is
-    # minor, anything else patch — except while the major is still 0, where
-    # breaking is capped at minor. The release itself is created by the `apk`
+    # minor, anything else patch. The release itself is created by the `apk`
     # job AFTER a successful build, with the APK attached — so a failed or
     # cancelled build leaves no empty release behind.
     if: github.event_name == 'push'
@@ -68,9 +67,6 @@ jobs:
           fi
           IFS=. read -r major minor patch <<<"$base"
           patch=${patch:-0}
-          if [ "$major" -eq 0 ] && [ "$bump" = major ]; then
-            bump=minor
-          fi
           case "$bump" in
             major) major=$((major + 1)); minor=0; patch=0 ;;
             minor) minor=$((minor + 1)); patch=0 ;;
