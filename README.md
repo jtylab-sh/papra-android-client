@@ -56,6 +56,18 @@ Grab the APK from the [latest release](../../releases/latest), or add this repo 
 [Obtainium](https://github.com/ImranR98/Obtainium) (`Add App` → paste the repo URL) to get updates.
 The APK is built for **arm64 (64-bit)** devices — any Android phone from roughly 2016 on.
 
+## Privacy
+
+- **All network traffic goes to the server URL you configure — nothing else.** The REST client,
+  the sign-in flow (better-auth) and file downloads only ever talk to your Papra instance.
+- **No analytics, no tracking, no crash reporting, no telemetry, no OTA update pings** — none of
+  those SDKs are in the app, and versions only change when you install a new APK yourself.
+- One qualified exception: the **document scanner** uses Google's ML Kit, which Android delivers
+  through Google Play services — the first scan may make Play services download the scanner module
+  from Google. Scanning itself runs on-device; documents are not uploaded anywhere except to your
+  server when you press upload.
+- Notifications are generated locally on the phone (no push service involved).
+
 ## Server requirements
 
 - A reachable Papra instance (any URL — LAN IP, VPN hostname, public domain).
