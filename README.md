@@ -48,6 +48,11 @@ project.
   exported to a folder you pick (visible in your file manager; the folder gets a `.nomedia` marker so
   synced images don't flood the phone's gallery, and files you delete from it are re-exported on
   the next sync). Turning sync off offers to delete all offline copies from the phone.
+  Syncs are **incremental** (only missing files download), **pause instead of failing when the
+  phone goes offline** and resume when connectivity returns, can be **paused manually** (Pause
+  button next to Sync now) and continue where they left off, and **pick up documents added while
+  the sync runs**. Every document page also has a per-document offline toggle: download one
+  document, or tap the cloud icon to remove its offline copy.
 - **Organizations**: switch between your Papra organizations or create a new one from Settings —
   each organization keeps its own offline mirror on the phone, so switching is instant and loses
   nothing.
@@ -58,7 +63,9 @@ project.
 - **Notifications** (all opt-in, per-event toggles in Settings; permission asked on first enable):
   new documents found by background sync, repeated sync failures, session expired, a warning
   when trashed documents are within 3 days of permanent deletion, and a live sync-progress
-  notification (manual and scheduled background syncs).
+  notification (manual and scheduled background syncs). Tapping a notification opens the matching
+  page: sync progress and sync failures land in Settings, new documents in the list, trash
+  warnings in Trash.
 - **Sync survives leaving the app**: with the sync-progress notification enabled, a manual sync
   runs inside an Android foreground service (`dataSync`), so all documents keep downloading with a
   progress notification even when you switch apps.

@@ -6,7 +6,7 @@
  * channel from Android settings. See docs/NOTIFICATIONS.md.
  */
 import * as Notifications from "expo-notifications";
-import notifee, { AndroidForegroundServiceType, AndroidImportance } from "react-native-notify-kit";
+import notifee, { AndroidForegroundServiceType, AndroidImportance, EventType } from "react-native-notify-kit";
 import { getSettings } from "./settings";
 
 Notifications.setNotificationHandler({
@@ -41,12 +41,13 @@ export async function requestNotificationPermission(): Promise<boolean> {
   return requested.granted;
 }
 
-async function post(channelId: "sync" | "alerts", title: string, body: string): Promise<void> {
+/** `url` is the in-app route a tap navigates to (see wireNotificationNavigation). */
+async function post(channelId: "sync" | "alerts", title: string, body: string, url: string): Promise<void> {
   try {
     await ensureChannels();
     if (!(await Notifications.getPermissionsAsync()).granted) return;
     await Notifications.scheduleNotificationAsync({
-      content: { title, body },
+      content: { title, body, data: { url } },
       trigger: { channelId },
     });
   } catch {
@@ -57,17 +58,22 @@ async function post(channelId: "sync" | "alerts", title: string, body: string): 
 export async function notifyNewDocuments(count: number, firstName: string): Promise<void> {
   if (!(await getSettings()).notifyNewDocuments) return;
   const title = count === 1 ? "1 new document" : `${count} new documents`;
-  await post("sync", title, count === 1 ? firstName : `${firstName}, …`);
+  await post("sync", title, count === 1 ? firstName : `${firstName}, …`, "/");
 }
 
 export async function notifySyncFailures(streak: number): Promise<void> {
   if (!(await getSettings()).notifySyncFailures) return;
-  await post("alerts", "Background sync keeps failing", `${streak} runs in a row. Open the app to check.`);
+  await post("alerts", "Background sync keeps failing", `${streak} runs in a row. Open the app to check.`, "/settings");
 }
 
 export async function notifySessionExpired(): Promise<void> {
   if (!(await getSettings()).notifySessionExpired) return;
-  await post("alerts", "Sign in again", "The Papra session expired; background sync is paused until you sign in.");
+  await post(
+    "alerts",
+    "Sign in again",
+    "The Papra session expired; background sync is paused until you sign in.",
+    "/sign-in",
+  );
 }
 
 export async function notifyTrashPurge(count: number, withinDays: number): Promise<void> {
@@ -76,7 +82,40 @@ export async function notifyTrashPurge(count: number, withinDays: number): Promi
     "alerts",
     "Trash purge soon",
     `${count} trashed document${count === 1 ? "" : "s"} will be permanently deleted within ${withinDays} day${withinDays === 1 ? "" : "s"}.`,
+    "/trash",
   );
+}
+
+/**
+ * Tap-to-navigate for every notification this app posts: expo-notifications
+ * carry their route in data.url; the sync-progress (notifee) notification
+ * always leads to Settings. Covers warm taps and cold starts from a tap.
+ * Returns the unsubscribe for both sources.
+ */
+export function wireNotificationNavigation(navigate: (url: string) => void): () => void {
+  const sub = Notifications.addNotificationResponseReceivedListener((resp) => {
+    const url = resp.notification.request.content.data?.url;
+    if (typeof url === "string") navigate(url);
+  });
+  Notifications.getLastNotificationResponseAsync()
+    .then((resp) => {
+      const url = resp?.notification.request.content.data?.url;
+      if (typeof url === "string") navigate(url);
+    })
+    .catch(() => {});
+  const unsubNotifee = notifee.onForegroundEvent(({ type, detail }) => {
+    if (type === EventType.PRESS && detail.pressAction?.id === SYNC_PROGRESS_ID) navigate("/settings");
+  });
+  notifee
+    .getInitialNotification()
+    .then((initial) => {
+      if (initial?.pressAction?.id === SYNC_PROGRESS_ID) navigate("/settings");
+    })
+    .catch(() => {});
+  return () => {
+    sub.remove();
+    unsubNotifee();
+  };
 }
 
 /**
@@ -92,6 +131,8 @@ const FGS_ANDROID = {
   foregroundServiceTypes: [AndroidForegroundServiceType.FOREGROUND_SERVICE_TYPE_DATA_SYNC],
   ongoing: true,
   onlyAlertOnce: true,
+  // Tap opens the app; wireNotificationNavigation routes it to Settings.
+  pressAction: { id: SYNC_PROGRESS_ID, launchActivity: "default" },
 };
 let lastProgressAt = 0;
 

@@ -116,7 +116,9 @@ export function DocumentRow({
         </View>
         {doc.fileUri ? (
           <MaterialCommunityIcons name="cloud-check-outline" size={18} color={theme.colors.primary} />
-        ) : null}
+        ) : (
+          <MaterialCommunityIcons name="cloud-off-outline" size={18} color={theme.colors.onSurfaceVariant} />
+        )}
       </View>
     </TouchableRipple>
   );

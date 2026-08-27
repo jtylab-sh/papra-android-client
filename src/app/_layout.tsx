@@ -8,6 +8,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { PaperProvider } from "react-native-paper";
 import { Button, Muted, Screen, Title } from "../components/ui";
 import { useAppTheme } from "../constants/theme";
+import { wireNotificationNavigation } from "../lib/notifications";
 import { getSettings } from "../lib/settings";
 // Side effect: defines the background sync task at module scope.
 import { signOutEverything } from "../lib/sync";
@@ -30,6 +31,19 @@ export default function RootLayout() {
   useEffect(() => {
     maybePromptUpdate();
   }, []);
+
+  // Tapping any of our notifications opens its page (sync progress -> Settings, ...).
+  useEffect(
+    () =>
+      wireNotificationNavigation((url) => {
+        try {
+          router.push(url as never);
+        } catch {
+          /* navigator not mounted yet */
+        }
+      }),
+    [],
+  );
 
   // Auto-open the biometric prompt whenever the lock screen appears.
   useEffect(() => {

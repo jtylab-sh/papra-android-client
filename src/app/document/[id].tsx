@@ -30,7 +30,7 @@ import {
   type PapraTag,
 } from "../../lib/papra";
 import { isPrintCancel, printDocument } from "../../lib/print";
-import { localFileNamedForUser } from "../../lib/sync";
+import { ensureLocalFile, localFileNamedForUser, removeLocalCopy } from "../../lib/sync";
 
 export default function DocumentScreen() {
   const theme = useTheme<AppTheme>();
@@ -155,6 +155,36 @@ export default function DocumentScreen() {
     }
   };
 
+  const downloadOffline = async () => {
+    if (!id) return;
+    setBusy("download");
+    try {
+      await ensureLocalFile(id);
+      setCached(getCachedDocument(id));
+    } catch (e) {
+      Alert.alert("Failed", e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const removeOffline = () => {
+    Alert.alert(
+      "Remove offline copy?",
+      "The document stays on the server. If offline sync is on, the next sync downloads it again.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Remove",
+          onPress: () => {
+            removeLocalCopy(id!);
+            setCached(getCachedDocument(id!));
+          },
+        },
+      ],
+    );
+  };
+
   const trash = () => {
     Alert.alert(
       "Move to trash?",
@@ -224,6 +254,16 @@ export default function DocumentScreen() {
           <ActionIcon icon="open-in-app" label="Open" onPress={open} busy={busy === "open"} />
           <ActionIcon icon="share-variant-outline" label="Share" onPress={share} busy={busy === "share"} />
           <ActionIcon icon="printer-outline" label="Print" onPress={print} busy={busy === "print"} />
+          {cached?.fileUri ? (
+            <ActionIcon icon="cloud-check-outline" label="Offline" onPress={removeOffline} />
+          ) : (
+            <ActionIcon
+              icon="cloud-off-outline"
+              label="Download"
+              onPress={downloadOffline}
+              busy={busy === "download"}
+            />
+          )}
           <ActionIcon icon="trash-can-outline" label="Trash" onPress={trash} danger />
         </Row>
       </View>

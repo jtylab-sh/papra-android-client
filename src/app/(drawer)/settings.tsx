@@ -24,6 +24,7 @@ import { getSettings, saveSettings, type Settings } from "../../lib/settings";
 import {
   applySyncRegistration,
   ensureNoMedia,
+  requestSyncPause,
   signOutEverything,
   syncMetadata,
   syncNow,
@@ -196,9 +197,11 @@ export default function SettingsScreen() {
       setProgress(
         result.skipped
           ? `Skipped (${result.skipped})`
-          : `Done: ${result.documents} documents, ${result.downloaded} downloaded${
-              result.failed ? `, ${result.failed} failed (${result.lastError})` : ""
-            }`,
+          : result.paused
+            ? `Paused after ${result.downloaded} downloads. Sync now continues where it left off.`
+            : `Done: ${result.documents} documents, ${result.downloaded} downloaded${
+                result.failed ? `, ${result.failed} failed (${result.lastError})` : ""
+              }`,
       );
     } catch (e) {
       setProgress(`Failed: ${e instanceof Error ? e.message : String(e)}`);
@@ -333,6 +336,7 @@ export default function SettingsScreen() {
 
         <View style={{ marginTop: spacing.md, gap: spacing.sm }}>
           <Button label="Sync now" kind="ghost" onPress={runSync} loading={syncing} />
+          {syncing ? <Button label="Pause" kind="ghost" onPress={requestSyncPause} /> : null}
           {progress ? <Muted>{progress}</Muted> : null}
           <Muted>
             Offline: {countOfflineOnDisk()} of {countCachedDocuments()} documents on this phone

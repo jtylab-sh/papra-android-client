@@ -182,14 +182,58 @@ export async function localFileNamedForUser(id: string): Promise<string> {
   return target.uri;
 }
 
-/** One retry after a short pause — enough for transient network/proxy hiccups. */
-async function downloadWithRetry(id: string): Promise<void> {
-  try {
-    await ensureLocalFile(id);
-  } catch {
-    await new Promise((r) => setTimeout(r, 1000));
-    await ensureLocalFile(id);
+/** Set by the Settings "Pause" button; checked between and inside downloads. */
+let pauseRequested = false;
+
+export function requestSyncPause(): void {
+  pauseRequested = true;
+}
+
+/** Thrown to unwind the download loop on user pause or background offline. */
+class SyncInterrupted extends Error {}
+
+async function isOffline(): Promise<boolean> {
+  const state = await Network.getNetworkStateAsync().catch(() => null);
+  return state?.isConnected === false;
+}
+
+/** Block until connectivity returns (or the user pauses). Foreground only. */
+async function waitForNetwork(): Promise<void> {
+  while (!pauseRequested && (await isOffline())) {
+    await new Promise((r) => setTimeout(r, 5000));
   }
+}
+
+/**
+ * Download with resilience. Offline mid-sync is a pause, not a failure:
+ * foreground runs wait for connectivity and retry the same document;
+ * background runs interrupt (WorkManager tries again later). Genuine online
+ * failures get one retry after a second.
+ */
+async function downloadWithRetry(id: string, background: boolean): Promise<void> {
+  let failures = 0;
+  for (;;) {
+    if (pauseRequested) throw new SyncInterrupted("paused");
+    try {
+      await ensureLocalFile(id);
+      return;
+    } catch (e) {
+      if (await isOffline()) {
+        if (background) throw new SyncInterrupted("offline");
+        await waitForNetwork();
+        continue;
+      }
+      if (++failures >= 2) throw e;
+      await new Promise((r) => setTimeout(r, 1000));
+    }
+  }
+}
+
+/** Drop one document's private offline copy. The next full sync downloads it again. */
+export function removeLocalCopy(id: string): void {
+  const cached = getCachedDocument(id);
+  if (cached?.fileUri) safeDelete(cached.fileUri);
+  setDocumentFileUri(id, null);
 }
 
 /**
@@ -231,6 +275,8 @@ export interface SyncResult {
   documents: number;
   downloaded: number;
   failed: number;
+  /** user paused, or a background run lost connectivity; the next run continues */
+  paused?: boolean;
   /** message of the last failed download — the only clue when many fail */
   lastError?: string;
 }
@@ -244,6 +290,7 @@ export async function syncNow(
   } = {},
 ): Promise<SyncResult> {
   const s = await getSettings();
+  pauseRequested = false;
   if (!isConnected(s)) return { skipped: "not-configured", documents: 0, downloaded: 0, failed: 0 };
   if (opts.respectWifiOnly && s.syncWifiOnly) {
     const state = await Network.getNetworkStateAsync();
@@ -266,6 +313,7 @@ export async function syncNow(
   let failed = 0;
   let done = 0;
   let lastError = "";
+  let paused = false;
   // Foreground service + progress notification: keeps a manual sync running
   // when the user leaves the app. Never from background tasks — Android 12+
   // forbids starting a foreground service from the background.
@@ -274,29 +322,50 @@ export async function syncNow(
   const useService = !opts.background && s.notifySyncProgress;
   const plainProgress = Boolean(opts.background) && s.notifySyncProgress;
   if (useService) await startSyncService().catch(() => {});
+  const processed = new Set<string>();
+  let queue = ids;
+  let total = ids.length;
   try {
-    for (const id of ids) {
-      const cached = getCachedDocument(id);
-      const needsFile = !cached?.fileUri || !new File(cached.fileUri).exists;
-      if (needsFile) {
-        try {
-          await downloadWithRetry(id);
-          downloaded++;
-        } catch (e) {
-          failed++;
-          lastError = e instanceof Error ? e.message : String(e);
+    // Rounds: when the queue drains, refresh metadata once more so documents
+    // added while the sync ran are picked up in the same run (capped so a
+    // constant stream of uploads can't keep the loop alive forever).
+    for (let round = 0; round < 3 && queue.length > 0 && !paused; round++) {
+      for (const id of queue) {
+        if (pauseRequested) {
+          paused = true;
+          break;
         }
+        processed.add(id);
+        const cached = getCachedDocument(id);
+        const needsFile = !cached?.fileUri || !new File(cached.fileUri).exists;
+        if (needsFile) {
+          try {
+            await downloadWithRetry(id, Boolean(opts.background));
+            downloaded++;
+          } catch (e) {
+            if (e instanceof SyncInterrupted) {
+              paused = true;
+              break;
+            }
+            failed++;
+            lastError = e instanceof Error ? e.message : String(e);
+          }
+        }
+        await exportCopy(id, s.offlineExportDirUri, exportNames);
+        opts.onProgress?.(++done, total);
+        if (useService || plainProgress) updateSyncProgress(done, total, useService).catch(() => {});
       }
-      await exportCopy(id, s.offlineExportDirUri, exportNames);
-      opts.onProgress?.(++done, ids.length);
-      if (useService || plainProgress) updateSyncProgress(done, ids.length, useService).catch(() => {});
+      if (paused) break;
+      const latest = await syncMetadata(s).catch(() => [] as string[]);
+      queue = latest.filter((docId) => !processed.has(docId));
+      total += queue.length;
     }
   } finally {
     if (useService) await stopSyncService().catch(() => {});
     if (plainProgress) await clearSyncNotification();
   }
   setMeta("lastSyncAt", new Date().toISOString());
-  return { documents: ids.length, downloaded, failed, lastError: lastError || undefined };
+  return { documents: total, downloaded, failed, paused: paused || undefined, lastError: lastError || undefined };
 }
 
 /**
