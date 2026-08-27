@@ -383,6 +383,61 @@ export default function DocumentsScreen() {
     [selected, docs, toggleSelect],
   );
 
+  // --- drag select: hold a row, then slide over neighbors to select them ---
+  const rowRefs = useRef(new Map<string, View>());
+  const selectedRef = useRef<Set<string> | null>(null);
+  useEffect(() => {
+    selectedRef.current = selected;
+  }, [selected]);
+  const dragSel = useRef<{
+    anchor: string;
+    base: Set<string> | null;
+    rows: { id: string; top: number; bottom: number }[];
+  } | null>(null);
+  const [dragging, setDragging] = useState(false);
+
+  // Scrolling is disabled while the finger stays down, so the window
+  // positions measured at drag start hold for the whole gesture.
+  // ponytail: no edge auto-scroll - long ranges use long-press range select.
+  const beginDrag = useCallback((docId: string) => {
+    if (rowRefs.current.size === 0) return;
+    const rows: { id: string; top: number; bottom: number }[] = [];
+    dragSel.current = { anchor: docId, base: null, rows };
+    setDragging(true);
+    for (const [id, ref] of rowRefs.current) {
+      ref.measureInWindow((_x, y, _w, h) => {
+        rows.push({ id, top: y, bottom: y + h });
+      });
+    }
+  }, []);
+
+  const dragMove = useCallback(
+    (e: { nativeEvent: { pageY: number } }) => {
+      const d = dragSel.current;
+      if (!d) return;
+      const y = e.nativeEvent.pageY;
+      const hovered = d.rows.find((r) => y >= r.top && y < r.bottom);
+      if (!hovered) return;
+      // The base is the selection as it stood when the drag began; the drag
+      // contributes anchor..hovered on top, so retreating shrinks correctly.
+      if (!d.base) d.base = new Set(selectedRef.current ?? []);
+      const ids = docs.map((x) => x.id);
+      const a = ids.indexOf(d.anchor);
+      const b = ids.indexOf(hovered.id);
+      if (a === -1 || b === -1) return;
+      const [lo, hi] = a < b ? [a, b] : [b, a];
+      const next = new Set(d.base);
+      for (const id of ids.slice(lo, hi + 1)) next.add(id);
+      setSelected(next);
+    },
+    [docs],
+  );
+
+  const endDrag = useCallback(() => {
+    dragSel.current = null;
+    setDragging(false);
+  }, []);
+
   // The hardware/gesture back button leaves selection mode instead of the screen.
   useEffect(() => {
     if (selected === null) return;
@@ -503,7 +558,12 @@ export default function DocumentsScreen() {
   if (!ready) return <View style={{ flex: 1, backgroundColor: theme.colors.background }} />;
 
   return (
-    <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+    <View
+      style={{ flex: 1, backgroundColor: theme.colors.background }}
+      onTouchMove={dragging ? dragMove : undefined}
+      onTouchEnd={dragging ? endDrag : undefined}
+      onTouchCancel={dragging ? endDrag : undefined}
+    >
       {selected ? (
         <Surface elevation={2} style={{ paddingHorizontal: spacing.sm }}>
           <View style={{ flexDirection: "row", alignItems: "center" }}>
@@ -584,6 +644,7 @@ export default function DocumentsScreen() {
       </View>
       <FlatList
         data={docs}
+        scrollEnabled={!dragging}
         keyExtractor={(d) => d.id}
         contentContainerStyle={{ padding: spacing.md }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={theme.colors.primary} />}
@@ -619,18 +680,28 @@ export default function DocumentsScreen() {
           ) : null
         }
         renderItem={({ item }) => (
-          <SwipeableRow
-            disabled={selected !== null}
-            onDownload={() => swipeDownload(item.id)}
-            onTrash={() => swipeTrash(item.id)}
+          <View
+            ref={(r) => {
+              if (r) rowRefs.current.set(item.id, r);
+              else rowRefs.current.delete(item.id);
+            }}
           >
-            <DocumentRow
-              doc={item}
-              selected={selected?.has(item.id) ?? false}
-              onPress={() => (selected ? toggleSelect(item.id) : router.push(`/document/${item.id}`))}
-              onLongPress={() => rangeSelect(item.id)}
-            />
-          </SwipeableRow>
+            <SwipeableRow
+              disabled={selected !== null}
+              onDownload={() => swipeDownload(item.id)}
+              onTrash={() => swipeTrash(item.id)}
+            >
+              <DocumentRow
+                doc={item}
+                selected={selected?.has(item.id) ?? false}
+                onPress={() => (selected ? toggleSelect(item.id) : router.push(`/document/${item.id}`))}
+                onLongPress={() => {
+                  rangeSelect(item.id);
+                  beginDrag(item.id);
+                }}
+              />
+            </SwipeableRow>
+          </View>
         )}
       />
       <Portal>
