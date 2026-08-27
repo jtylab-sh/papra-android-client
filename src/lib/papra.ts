@@ -262,6 +262,50 @@ export async function deleteTag(tagId: string): Promise<void> {
   await papraRequest(orgPath(s, `/tags/${tagId}`), { method: "DELETE", settings: s });
 }
 
+/** Org-wide custom property definition (the /custom-properties module). */
+export interface PapraCustomPropertyDefinition {
+  id: string;
+  name: string;
+  key: string;
+  description?: string | null;
+  type: PapraCustomProperty["type"];
+  displayOrder: number;
+}
+
+export async function listCustomProperties(): Promise<PapraCustomPropertyDefinition[]> {
+  const s = await getSettings();
+  const json = await papraRequest<{ propertyDefinitions: PapraCustomPropertyDefinition[] }>(
+    orgPath(s, "/custom-properties"),
+    { settings: s },
+  );
+  return json.propertyDefinitions ?? [];
+}
+
+/** `options` is required by the server for select / multi_select types. */
+export async function createCustomProperty(input: {
+  type: PapraCustomProperty["type"];
+  name: string;
+  description?: string;
+  options?: { name: string }[];
+}): Promise<void> {
+  const s = await getSettings();
+  await papraRequest(orgPath(s, "/custom-properties"), { method: "POST", body: input, settings: s });
+}
+
+/** Type is immutable server-side; omitting `options` keeps existing choices. */
+export async function updateCustomProperty(
+  id: string,
+  patch: { name?: string; description?: string },
+): Promise<void> {
+  const s = await getSettings();
+  await papraRequest(orgPath(s, `/custom-properties/${id}`), { method: "PUT", body: patch, settings: s });
+}
+
+export async function deleteCustomProperty(id: string): Promise<void> {
+  const s = await getSettings();
+  await papraRequest(orgPath(s, `/custom-properties/${id}`), { method: "DELETE", settings: s });
+}
+
 export async function addTagToDocument(documentId: string, tagId: string): Promise<void> {
   const s = await getSettings();
   await papraRequest(orgPath(s, `/documents/${documentId}/tags`), { method: "POST", body: { tagId }, settings: s });

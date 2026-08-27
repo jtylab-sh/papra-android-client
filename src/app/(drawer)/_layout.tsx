@@ -42,6 +42,10 @@ export default function DrawerLayout() {
         options={{ title: "Tags", drawerIcon: drawerIcon("tag-multiple-outline") }}
       />
       <Drawer.Screen
+        name="properties"
+        options={{ title: "Properties", drawerIcon: drawerIcon("format-list-bulleted-type") }}
+      />
+      <Drawer.Screen
         name="trash"
         options={{ title: "Trash", drawerIcon: drawerIcon("trash-can-outline") }}
       />

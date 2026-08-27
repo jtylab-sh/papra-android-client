@@ -1,6 +1,7 @@
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Alert, FlatList, RefreshControl, ScrollView, View } from "react-native";
+import { Alert, BackHandler, FlatList, RefreshControl, ScrollView, View } from "react-native";
+import Share from "react-native-share";
 import {
   Button as PaperButton,
   Chip,
@@ -32,8 +33,9 @@ import {
   type PapraDocumentView,
 } from "../../lib/papra";
 import { pickFiles, scanDocuments } from "../../lib/pickers";
+import { isPrintCancel, printDocument } from "../../lib/print";
 import { getSettings, isConnected } from "../../lib/settings";
-import { ensureLocalFile, syncMetadata } from "../../lib/sync";
+import { ensureLocalFile, localFileNamedForUser, syncMetadata } from "../../lib/sync";
 
 export default function DocumentsScreen() {
   const theme = useTheme<AppTheme>();
@@ -201,6 +203,58 @@ export default function DocumentsScreen() {
     });
   }, []);
 
+  // The hardware/gesture back button leaves selection mode instead of the screen.
+  useEffect(() => {
+    if (selected === null) return;
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      setSelected(null);
+      return true;
+    });
+    return () => sub.remove();
+  }, [selected]);
+
+  /** Everything in the current filter (local mode) or everything loaded (server search). */
+  const selectAll = useCallback(() => {
+    const ids = serverMode
+      ? docs.map((d) => d.id)
+      : listCachedDocuments(search, -1, 0, notSynced ? false : undefined).map((d) => d.id);
+    setSelected(ids.length ? new Set(ids) : null);
+  }, [serverMode, docs, search, notSynced]);
+
+  const massShare = useCallback(async () => {
+    const ids = [...(selected ?? [])];
+    try {
+      const urls: string[] = [];
+      for (let i = 0; i < ids.length; i++) {
+        setMassProgress(`Preparing ${i + 1}/${ids.length}`);
+        urls.push(await localFileNamedForUser(ids[i]));
+      }
+      setMassProgress("");
+      await Share.open({ urls });
+      setSelected(null);
+    } catch (e) {
+      // Dismissing the share sheet rejects too; only real failures matter.
+      const message = e instanceof Error ? e.message : String(e);
+      if (!/did not share|cancel/i.test(message)) Alert.alert("Failed", message);
+    } finally {
+      setMassProgress("");
+    }
+  }, [selected]);
+
+  const massPrint = useCallback(async () => {
+    const ids = [...(selected ?? [])];
+    for (let i = 0; i < ids.length; i++) {
+      setMassProgress(`Printing ${i + 1}/${ids.length}`);
+      try {
+        await printDocument(ids[i]);
+      } catch (e) {
+        if (!isPrintCancel(e)) Alert.alert("Failed", e instanceof Error ? e.message : String(e));
+        break; // cancel or error: stop the queue, keep the selection
+      }
+    }
+    setMassProgress("");
+  }, [selected]);
+
   const massDownload = useCallback(async () => {
     const ids = [...(selected ?? [])];
     let failed = 0;
@@ -256,6 +310,9 @@ export default function DocumentsScreen() {
           <Text variant="titleSmall" style={{ flex: 1 }}>
             {massProgress || `${selected.size} selected`}
           </Text>
+          <IconButton icon="select-all" disabled={!!massProgress} onPress={selectAll} />
+          <IconButton icon="share-variant-outline" disabled={!!massProgress} onPress={massShare} />
+          <IconButton icon="printer-outline" disabled={!!massProgress} onPress={massPrint} />
           <IconButton icon="cloud-download-outline" disabled={!!massProgress} onPress={massDownload} />
           <IconButton icon="trash-can-outline" disabled={!!massProgress} onPress={massTrash} />
         </Surface>

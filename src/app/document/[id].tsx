@@ -29,6 +29,7 @@ import {
   type PapraDocument,
   type PapraTag,
 } from "../../lib/papra";
+import { isPrintCancel, printDocument } from "../../lib/print";
 import { localFileNamedForUser } from "../../lib/sync";
 
 export default function DocumentScreen() {
@@ -142,6 +143,18 @@ export default function DocumentScreen() {
       await Sharing.shareAsync(uri, { mimeType: mime });
     });
 
+  const print = async () => {
+    if (!id) return;
+    setBusy("print");
+    try {
+      await printDocument(id);
+    } catch (e) {
+      if (!isPrintCancel(e)) Alert.alert("Failed", e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const trash = () => {
     Alert.alert(
       "Move to trash?",
@@ -210,6 +223,7 @@ export default function DocumentScreen() {
         <Row style={{ justifyContent: "center", gap: spacing.lg }}>
           <ActionIcon icon="open-in-app" label="Open" onPress={open} busy={busy === "open"} />
           <ActionIcon icon="share-variant-outline" label="Share" onPress={share} busy={busy === "share"} />
+          <ActionIcon icon="printer-outline" label="Print" onPress={print} busy={busy === "print"} />
           <ActionIcon icon="trash-can-outline" label="Trash" onPress={trash} danger />
         </Row>
       </View>

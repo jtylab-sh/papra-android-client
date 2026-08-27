@@ -28,11 +28,16 @@ project.
   are stored server-side and shared with the web UI.
 - **Tags**: create, edit and delete org tags (colors + descriptions), and add/remove tags on any
   document.
-- **Multi-select** (long press): batch move-to-trash and batch download-offline.
+- **Custom properties**: create, rename and delete the org's property definitions (text, number,
+  date, yes/no, select, multi-select with options) from their own page; document values show on the
+  document page.
+- **Multi-select** (long press): select all, batch share, batch print, batch move-to-trash and
+  batch download-offline; the back button leaves selection mode.
 - **Upload** via in-app file picker, the Android share sheet (share any file to Papra), or the built-in
   **document scanner** (ML Kit edge detection).
-- **Open / download / share** document files under their display name. The document page leads with
-  a preview (images) or type icon, name with inline **rename**, one-tap open/share/trash, and
+- **Open / download / share / print** document files under their display name (printing goes
+  through the Android system print dialog; PDFs and images). The document page leads with
+  a preview (images) or type icon, name with inline **rename**, one-tap open/share/print/trash, and
   collapsible extracted-text / details sections.
 - **Trash** like the web app: restore, delete forever, empty trash — every delete is confirmed with
   the 30-day retention notice, and trash rows show the time left until permanent deletion.
