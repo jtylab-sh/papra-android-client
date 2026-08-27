@@ -432,6 +432,22 @@ export default function SettingsScreen() {
         </Row>
       </Card>
 
+      <Card>
+        <Row style={{ justifyContent: "space-between" }}>
+          <View style={{ flex: 1 }}>
+            <Text variant="titleMedium">Update check</Text>
+            <Muted>
+              Asks GitHub for a newer release on app start, once per version. Keep off if Obtainium
+              or another store manages updates.
+            </Muted>
+          </View>
+          <Switch
+            value={settings.updateCheckEnabled}
+            onValueChange={(v: boolean) => update({ updateCheckEnabled: v })}
+          />
+        </Row>
+      </Card>
+
       <Button label="Sign out" kind="danger" onPress={signOut} />
 
       <View style={{ alignItems: "center" }}>

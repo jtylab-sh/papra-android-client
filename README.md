@@ -73,10 +73,15 @@ project.
 - **Sync survives leaving the app**: with the sync-progress notification enabled, a manual sync
   runs inside an Android foreground service (`dataSync`), so all documents keep downloading with a
   progress notification even when you switch apps.
+- **Home page**: quick Scan/Upload actions, organization statistics from the server (document
+  count, size, trash) plus the offline count and last sync time, and the 20 most recent documents.
+- **Offline banner**: a red strip at the top of the app whenever the phone has no connectivity,
+  so cached data is clearly labeled as such.
 - **Biometric lock** (fingerprint / face) with a configurable grace period (default 5 min), an
   auto-opening prompt, and sign-out from the lock screen.
-- **Version + update check**: the app version shows at the bottom of Settings, and a popup (once
-  per version) offers new GitHub releases on start.
+- **Version + update check**: the app version shows at the bottom of Settings; an **opt-in**
+  update check (Settings -> Update check, off by default so Obtainium/store users are never
+  nagged) offers new GitHub releases on start, once per version.
 
 ## Install
 
@@ -98,9 +103,9 @@ The APK is built for **arm64 (64-bit)** devices — any Android phone from rough
 - **In-app updates**: the update popup can download the APK and open the Android installer
   directly (the first time, Android asks you to allow installs from Papra); if anything fails it
   falls back to the release page in the browser.
-- One exception to server-only traffic: on start the app checks this repo's GitHub releases
-  (`api.github.com`) for a newer version. Plain unauthenticated GET, nothing sent beyond the
-  request itself.
+- One exception to server-only traffic, and only when you enable the update check in Settings
+  (off by default): on start the app asks this repo's GitHub releases (`api.github.com`) for a
+  newer version. Plain unauthenticated GET, nothing sent beyond the request itself.
 
 ## Server requirements
 

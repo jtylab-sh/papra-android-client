@@ -131,6 +131,23 @@ export interface DocumentPage {
   documentsCount: number;
 }
 
+export interface PapraOrgStats {
+  documentsCount: number;
+  documentsSize: number;
+  deletedDocumentsCount: number;
+  deletedDocumentsSize: number;
+  totalDocumentsCount: number;
+  totalDocumentsSize: number;
+}
+
+export async function getDocumentsStatistics(): Promise<PapraOrgStats> {
+  const s = await getSettings();
+  const json = await papraRequest<{ organizationStats: PapraOrgStats }>(orgPath(s, "/documents/statistics"), {
+    settings: s,
+  });
+  return json.organizationStats;
+}
+
 export type DocumentSortField = "createdAt" | "updatedAt" | "name" | "documentDate";
 export type DocumentSortOrder = "asc" | "desc";
 

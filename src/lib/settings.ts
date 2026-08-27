@@ -35,6 +35,8 @@ export interface Settings {
    * is left mid-sync (Android requires a visible notification for that).
    */
   notifySyncProgress: boolean;
+  /** opt-in GitHub release check on start; off by default (Obtainium/store users) */
+  updateCheckEnabled: boolean;
 }
 
 export const DEFAULTS: Settings = {
@@ -54,6 +56,7 @@ export const DEFAULTS: Settings = {
   notifySessionExpired: false,
   notifyTrashPurge: false,
   notifySyncProgress: false,
+  updateCheckEnabled: false,
 };
 
 const KEY = "papra.settings";

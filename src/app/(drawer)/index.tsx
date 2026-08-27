@@ -335,12 +335,15 @@ export default function DocumentsScreen() {
     return () => sub.remove();
   }, [selected]);
 
-  /** Everything in the current filter (local mode) or everything loaded (server search). */
+  /**
+   * Everything in the current filter (local mode) or everything loaded (server
+   * search). Pressing again with everything already selected deselects all.
+   */
   const selectAll = useCallback(() => {
     const ids = serverMode
       ? docs.map((d) => d.id)
       : listCachedDocuments(search, -1, 0, notSynced ? false : undefined).map((d) => d.id);
-    setSelected(ids.length ? new Set(ids) : null);
+    setSelected((prev) => (prev && prev.size === ids.length ? null : ids.length ? new Set(ids) : null));
   }, [serverMode, docs, search, notSynced]);
 
   const massShare = useCallback(async () => {
@@ -523,7 +526,7 @@ export default function DocumentsScreen() {
                 compact
                 icon="bookmark-outline"
                 mode={search.trim() === v.query ? "flat" : "outlined"}
-                onPress={() => onSearchChange(v.query)}
+                onPress={() => onSearchChange(search.trim() === v.query ? "" : v.query)}
                 onLongPress={() => confirmDeleteView(v)}
                 style={{ marginRight: 6 }}
               >

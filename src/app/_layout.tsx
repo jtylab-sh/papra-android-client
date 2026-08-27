@@ -3,9 +3,10 @@ import { Stack, router } from "expo-router";
 import { useShareIntent } from "expo-share-intent";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Alert, AppState } from "react-native";
+import * as Network from "expo-network";
+import { Alert, AppState, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { PaperProvider } from "react-native-paper";
+import { PaperProvider, Text } from "react-native-paper";
 import { Button, Muted, Screen, Title } from "../components/ui";
 import { useAppTheme } from "../constants/theme";
 import { wireNotificationNavigation } from "../lib/notifications";
@@ -27,9 +28,12 @@ export default function RootLayout() {
     if (result.success) setLocked(false);
   }, []);
 
-  // Once per new version: offer the newer GitHub release.
+  // Once per new version: offer the newer GitHub release. Opt-in (Settings ->
+  // Update check), so Obtainium/store users never see the nag.
   useEffect(() => {
-    maybePromptUpdate();
+    getSettings().then((s) => {
+      if (s.updateCheckEnabled) maybePromptUpdate();
+    });
   }, []);
 
   // Tapping any of our notifications opens its page (sync progress -> Settings, ...).
@@ -102,10 +106,20 @@ export default function RootLayout() {
   }, [hasShareIntent, shareIntent, resetShareIntent]);
 
   // One provider around both branches: the lock screen is Paper-themed too.
+  const network = Network.useNetworkState();
+  const offline = network.isConnected === false;
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <PaperProvider theme={appTheme}>
       <StatusBar style="light" />
+      {offline ? (
+        <View style={{ backgroundColor: appTheme.colors.errorContainer, paddingVertical: 4, alignItems: "center" }}>
+          <Text variant="labelSmall" style={{ color: appTheme.colors.onErrorContainer }}>
+            Offline - showing cached data
+          </Text>
+        </View>
+      ) : null}
       {locked !== false ? (
         <Screen style={{ justifyContent: "center", gap: 12 }}>
           <Title>Papra</Title>

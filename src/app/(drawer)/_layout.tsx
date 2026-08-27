@@ -16,6 +16,7 @@ export default function DrawerLayout() {
   const theme = useTheme<AppTheme>();
   return (
     <Drawer
+      initialRouteName="home"
       screenOptions={{
         headerStyle: { backgroundColor: theme.colors.surface },
         headerTintColor: theme.colors.onSurface,
@@ -26,6 +27,10 @@ export default function DrawerLayout() {
         drawerInactiveTintColor: theme.colors.onSurfaceVariant,
       }}
     >
+      <Drawer.Screen
+        name="home"
+        options={{ title: "Home", drawerIcon: drawerIcon("home-outline") }}
+      />
       <Drawer.Screen
         name="index"
         options={{
