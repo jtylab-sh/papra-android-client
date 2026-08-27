@@ -147,7 +147,20 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-        run: cd android && ./gradlew --no-daemon --build-cache --parallel assembleRelease
+        run: |
+          set -o pipefail
+          cd android && ./gradlew --no-daemon --build-cache --parallel --stacktrace assembleRelease 2>&1 | tee /tmp/gradle.log
+      # Job logs are admin-only via the API; the step summary is on the public
+      # run page — put the failure there so it can be diagnosed remotely.
+      - name: Surface gradle failure
+        if: failure()
+        run: |
+          {
+            echo '## Gradle failure'
+            echo '```'
+            grep -B 2 -A 40 "What went wrong" /tmp/gradle.log | head -120 || tail -120 /tmp/gradle.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
       - name: Create release with APK
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
