@@ -8,7 +8,7 @@ import { Button, Card, KeyValue, Muted, TagChip, formatBytes, formatDate } from 
 import { colors, spacing } from "../../constants/theme";
 import { getCachedDocument, upsertDocuments, type CachedDocument } from "../../lib/db";
 import { getDocument, trashDocument, type PapraDocument } from "../../lib/papra";
-import { ensureLocalFile } from "../../lib/sync";
+import { localFileNamedForUser } from "../../lib/sync";
 
 export default function DocumentScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -35,7 +35,7 @@ export default function DocumentScreen() {
       if (!id) return;
       setBusy(label);
       try {
-        const uri = await ensureLocalFile(id);
+        const uri = await localFileNamedForUser(id);
         setCached(getCachedDocument(id));
         await action(uri, cached?.mimeType || "application/octet-stream");
       } catch (e) {

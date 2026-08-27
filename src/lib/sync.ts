@@ -79,6 +79,27 @@ export async function ensureLocalFile(id: string): Promise<string> {
   return file.uri;
 }
 
+/**
+ * The mirror stores blobs as <id>.<ext> (stable, collision-free). Anything
+ * user-visible (share sheet, "open with") gets a cache copy carrying the
+ * document's display name so the receiving app sees the real filename.
+ */
+export async function localFileNamedForUser(id: string): Promise<string> {
+  const uri = await ensureLocalFile(id);
+  const cached = getCachedDocument(id);
+  const ext = extensionFor(cached!);
+  const base = (cached!.name || `document.${ext}`)
+    .replace(/[\\/:*?"<>|\x00-\x1f]+/g, "_")
+    .slice(0, 120);
+  const named = base.toLowerCase().endsWith(`.${ext}`) ? base : `${base}.${ext}`;
+  const dir = new Directory(Paths.cache, "share");
+  if (!dir.exists) dir.create({ intermediates: true });
+  const target = new File(dir, named);
+  if (target.exists) target.delete();
+  new File(uri).copy(target);
+  return target.uri;
+}
+
 export interface SyncResult {
   skipped?: "not-configured" | "wifi";
   documents: number;
