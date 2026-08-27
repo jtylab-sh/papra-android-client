@@ -35,8 +35,8 @@ project.
 - **Multi-select** (long press): select all, batch tag/untag, batch share, batch print, batch
   move-to-trash and batch download-offline; the back button leaves selection mode.
 - **Swipe actions**: swipe a document row right to download it offline, left to move it to trash.
-- **Sort and tag filters**: sort by date, name or last update (locally and in server search), and
-  one-tap tag chips filter the list through the server's `tag:` syntax.
+- **Sort**: by date, name or last update, applied locally and passed to server search; tags are
+  still searchable through the `tag:` query syntax.
 - **Upload** via in-app file picker, the Android share sheet (share any file to Papra), or the built-in
   **document scanner** (ML Kit edge detection).
 - **Open / download / share / print** document files under their display name (printing goes

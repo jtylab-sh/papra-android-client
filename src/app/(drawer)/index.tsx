@@ -1,6 +1,5 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { useIsFocused } from "@react-navigation/native";
-import { router, useFocusEffect } from "expo-router";
+import { router, useFocusEffect, useIsFocused } from "expo-router";
 import { useCallback, useEffect, useRef, useState, type PropsWithChildren } from "react";
 import { Alert, BackHandler, FlatList, RefreshControl, ScrollView, View } from "react-native";
 import ReanimatedSwipeable, { type SwipeableMethods } from "react-native-gesture-handler/ReanimatedSwipeable";
@@ -508,22 +507,6 @@ export default function DocumentsScreen() {
             >
               Not synced
             </Chip>
-            {allTags.map((t) => {
-              const q = `tag:"${t.name}"`;
-              const activeTag = search.trim() === q;
-              return (
-                <Chip
-                  key={t.id}
-                  compact
-                  icon="tag-outline"
-                  mode={activeTag ? "flat" : "outlined"}
-                  onPress={() => onSearchChange(activeTag ? "" : q)}
-                  style={{ marginRight: 6 }}
-                >
-                  {t.name}
-                </Chip>
-              );
-            })}
             {views.map((v) => (
               <Chip
                 key={v.id}
