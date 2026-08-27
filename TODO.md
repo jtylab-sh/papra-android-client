@@ -1,9 +1,8 @@
 # TODO
 
-- **Progress notifications**: show an Android notification while a background/foreground
-  sync is running (n/total files) and while an upload is in progress, so long operations
-  are visible outside the app. Needs `expo-notifications` (local-only, no push) and a
-  `POST_NOTIFICATIONS` runtime permission prompt on Android 13+.
+- **Notifications**: implement the plan in [docs/NOTIFICATIONS.md](docs/NOTIFICATIONS.md)
+  (sync results, transfer progress, session-expired / trash-purge alerts; local-only via
+  `expo-notifications`, `POST_NOTIFICATIONS` prompt on Android 13+).
 - **Slim the APK**: current release APK is ~106 MB because it bundles all four CPU ABIs.
   Options: `splits { abi { enable true } }` in gradle (per-ABI APKs, ~30 MB each — Obtainium
   handles picking the right one poorly, so prefer:) or `ndk.abiFilters arm64-v8a` only —

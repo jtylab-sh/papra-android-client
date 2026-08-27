@@ -11,15 +11,29 @@ project.
 - **Sign in with email & password**, including **two-factor (TOTP) accounts** — Papra's better-auth
   session over the `papra://` app scheme that Papra trusts out of the box. The device is remembered
   after the first code.
-- **Browse documents** with tags, size, dates, custom properties and extracted OCR content; search by
-  name offline, or submit the search to the server for full-content search.
+- **Material You** — Material 3 dark UI; on Android 12+ the palette follows the system
+  (wallpaper) colors, with a papra-green fallback elsewhere. Themed (monochrome) app icon on
+  Android 13+.
+- **Browse documents** in a paginated list with tags, size, dates, typed custom properties and
+  extracted OCR content; navigation lives in a hamburger drawer (Documents / Offline / Tags /
+  Trash / Settings) like the Papra web sidebar.
+- **Search like Papra**, results streaming in as you type: the server's real query grammar —
+  `AND`/`OR`/`NOT`, `-negation`, `"quoted phrases"`, `tag:`, `name:`, `content:`, `created:`,
+  `date:`, `has:` filters. Offline it falls back to local name search.
+- **Tags**: create, edit and delete org tags (colors + descriptions), and add/remove tags on any
+  document.
+- **Multi-select** (long press): batch move-to-trash and batch download-offline.
 - **Upload** via in-app file picker, the Android share sheet (share any file to Papra), or the built-in
   **document scanner** (ML Kit edge detection).
-- **Open / download / share** document files.
-- **Trash** like the web app: move to trash, restore, delete forever, empty trash.
+- **Open / download / share** document files under their display name.
+- **Trash** like the web app: restore, delete forever, empty trash — every delete is confirmed with
+  the 30-day retention notice, and trash rows show the time left until permanent deletion.
 - **Offline sync job**: optionally mirror every document to the phone on a schedule (15 min – 24 h,
-  Wi-Fi-only option) using Android WorkManager. Documents open instantly and without a network.
-- **Biometric lock** (fingerprint / face) on app open.
+  Wi-Fi-only option) using Android WorkManager; an Offline tab lists what's on the phone, offline
+  documents are marked with a cloud icon, and copies can additionally be exported to a folder you
+  pick (visible in your file manager).
+- **Biometric lock** (fingerprint / face) with a configurable grace period (default 5 min), an
+  auto-opening prompt, and sign-out from the lock screen.
 
 ## Install
 
@@ -54,8 +68,8 @@ npx expo prebuild -p android && cd android && ./gradlew assembleRelease   # loca
 ## Release flow
 
 Push to `main` → CI type-checks → a version is computed from conventional-commit messages since the last
-tag (`feat:` = minor, `fix:`/anything else = patch, `!`/`BREAKING CHANGE` = major, capped at minor while
-pre-1.0) → a GitHub release is created → a signed APK is built and attached to it.
+tag (`feat:` = minor, `fix:`/anything else = patch, `!`/`BREAKING CHANGE` = major) → the APK is
+built and signed → only on success is the GitHub release created with the APK attached.
 
 Repository secrets required for signing: `KEYSTORE_B64` (base64 of the keystore), `KEYSTORE_PASSWORD`,
 `KEY_ALIAS`, `KEY_PASSWORD`. The keystore must never change once published — Android refuses updates
