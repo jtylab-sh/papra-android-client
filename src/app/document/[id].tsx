@@ -14,6 +14,7 @@ import {
   listTags,
   removeTagFromDocument,
   trashDocument,
+  type PapraCustomProperty,
   type PapraDocument,
   type PapraTag,
 } from "../../lib/papra";
@@ -144,8 +145,10 @@ export default function DocumentScreen() {
 
   const doc = { ...cached, ...live } as Partial<PapraDocument> & Partial<CachedDocument>;
   const tags = live?.tags ?? cached?.tags ?? [];
-  // Papra enriches documents with custom properties; shape is a map or list.
-  const customProperties = (live as unknown as { customProperties?: unknown })?.customProperties;
+  // One entry per org-wide property definition; only set values are shown.
+  const customProperties = (live?.customProperties ?? [])
+    .filter((prop) => prop.value !== null && prop.value !== undefined && prop.value !== "")
+    .sort((a, b) => a.displayOrder - b.displayOrder);
 
   return (
     <ScrollView
@@ -206,12 +209,12 @@ export default function DocumentScreen() {
         </Dialog>
       </Portal>
 
-      {customProperties != null && Object.keys(customProperties as object).length > 0 && (
+      {customProperties.length > 0 && (
         <Card>
-          <Muted>Custom properties</Muted>
+          <Muted>Properties</Muted>
           <View style={{ marginTop: 8 }}>
-            {Object.entries(customProperties as Record<string, unknown>).map(([k, v]) => (
-              <KeyValue key={k} label={k} value={typeof v === "object" ? JSON.stringify(v) : String(v)} />
+            {customProperties.map((prop) => (
+              <KeyValue key={prop.key} label={prop.name || prop.key} value={formatPropertyValue(prop)} />
             ))}
           </View>
         </Card>
@@ -233,4 +236,18 @@ export default function DocumentScreen() {
       </View>
     </ScrollView>
   );
+}
+
+/** Papra-style value rendering per property type — never raw JSON. */
+function formatPropertyValue(prop: PapraCustomProperty): string {
+  const { type, value } = prop;
+  if (type === "boolean") return value ? "Yes" : "No";
+  if (type === "date") return formatDate(String(value));
+  if (type === "multi_select" && Array.isArray(value)) return value.map(String).join(", ");
+  if (type === "user_relation" && value && typeof value === "object") {
+    const u = value as { name?: string; email?: string };
+    return u.name || u.email || String(value);
+  }
+  if (typeof value === "object") return JSON.stringify(value);
+  return String(value);
 }

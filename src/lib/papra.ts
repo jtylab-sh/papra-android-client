@@ -14,6 +14,23 @@ export interface PapraTag {
   description?: string | null;
 }
 
+export interface PapraCustomProperty {
+  key: string;
+  name: string;
+  type:
+    | "text"
+    | "number"
+    | "date"
+    | "boolean"
+    | "select"
+    | "multi_select"
+    | "user_relation"
+    | "document_relation";
+  displayOrder: number;
+  /** null when the property is not set on this document */
+  value: unknown;
+}
+
 export interface PapraDocument {
   id: string;
   name: string;
@@ -27,6 +44,7 @@ export interface PapraDocument {
   isDeleted?: boolean;
   content?: string | null;
   tags?: PapraTag[];
+  customProperties?: PapraCustomProperty[];
 }
 
 export interface PapraOrganization {
