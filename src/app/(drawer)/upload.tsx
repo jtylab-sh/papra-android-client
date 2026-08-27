@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
-import { FlatList, View } from "react-native";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Alert, FlatList, View } from "react-native";
 import { Button as PaperButton, Dialog, IconButton, Portal, Text, useTheme } from "react-native-paper";
 import { Button, Card, Input, Muted, Row } from "~/components/ui";
 import { spacing, type AppTheme } from "~/constants/theme";
@@ -22,7 +22,10 @@ export default function UploadScreen() {
   const params = useLocalSearchParams<{ files?: string; mode?: string }>();
   const [files, setFiles] = useState<PendingFile[]>([]);
   const [busy, setBusy] = useState(false);
-  const [rename, setRename] = useState<{ index: number; text: string } | null>(null);
+  const [rename, setRename] = useState<{ uri: string; text: string } | null>(null);
+  // Set to a row's uri when cancelling its name prompt should discard the
+  // scan and leave (deep-linked scans, per the scanner-cancel behavior).
+  const scanCancel = useRef<string | null>(null);
 
   // Deep links (widget, quick action) can land here with no history.
   const leave = useCallback(() => {
@@ -32,9 +35,10 @@ export default function UploadScreen() {
 
   const saveRename = useCallback(() => {
     if (!rename) return;
+    scanCancel.current = null;
     setFiles((prev) =>
-      prev.map((f, j) => {
-        if (j !== rename.index) return f;
+      prev.map((f) => {
+        if (f.uri !== rename.uri) return f;
         let name = rename.text.trim();
         if (!name) return f;
         // Keep the original extension when the new name has none.
@@ -46,6 +50,16 @@ export default function UploadScreen() {
     setRename(null);
   }, [rename]);
 
+  const cancelRename = useCallback(() => {
+    const uri = rename?.uri;
+    setRename(null);
+    if (uri && scanCancel.current === uri) {
+      scanCancel.current = null;
+      setFiles((prev) => prev.filter((f) => f.uri !== uri));
+      leave();
+    }
+  }, [rename, leave]);
+
   const pick = useCallback(async (): Promise<boolean> => {
     const picked = await pickFiles();
     if (!picked.length) return false;
@@ -53,42 +67,53 @@ export default function UploadScreen() {
     return true;
   }, []);
 
-  const scan = useCallback(async (): Promise<boolean> => {
-    const picked = await scanDocuments();
+  const scan = useCallback(async (leaveOnCancel = false): Promise<boolean> => {
+    const picked = await scanDocuments(); // one merged PDF per scan session
     if (!picked.length) return false;
-    setFiles((prev) => [...prev, ...picked.map((f) => ({ ...f, status: "pending" as const }))]);
+    const row = { ...picked[0], status: "pending" as const };
+    setFiles((prev) => [...prev, row]);
+    // Scans get their name prompt right away, prefilled with the default.
+    scanCancel.current = leaveOnCancel ? row.uri : null;
+    setRename({ uri: row.uri, text: row.name });
     return true;
   }, []);
 
+  // Drawer screens stay mounted, so params must be consumed on every change,
+  // not only on mount - and delivered files append instead of replacing.
   useEffect(() => {
     if (params.files) {
+      router.setParams({ files: "" });
       try {
         const shared = JSON.parse(params.files) as { uri: string; name?: string; mimeType?: string }[];
-        setFiles(
-          shared.map((f) => ({
+        setFiles((prev) => [
+          ...prev,
+          ...shared.map((f) => ({
             uri: f.uri.startsWith("file://") || f.uri.startsWith("content://") ? f.uri : `file://${f.uri}`,
             name: f.name || f.uri.split("/").pop() || "shared-file",
             mimeType: f.mimeType,
-            status: "pending",
+            status: "pending" as const,
           })),
-        );
+        ]);
       } catch {
         /* malformed share payload — user can still pick manually */
       }
     } else if (params.mode === "scan") {
       // Deep-link launch (Scan widget): open the scanner straight away, and
-      // if the user cancels there, leave — never strand them on an empty page.
-      scan().then((got) => {
+      // if the user cancels there or at the name prompt, leave — never
+      // strand them on an empty page.
+      router.setParams({ mode: "" });
+      scan(true).then((got) => {
         if (!got) leave();
       });
     } else if (params.mode === "pick") {
       // Launcher shortcut: straight into the file picker.
+      router.setParams({ mode: "" });
       pick().then((got) => {
         if (!got) leave();
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [params.files, params.mode]);
 
   const upload = useCallback(async () => {
     setBusy(true);
@@ -112,17 +137,23 @@ export default function UploadScreen() {
     const result = await flushUploads();
     const sentKeys = new Set(result?.sentKeys ?? []);
     const dropped = new Map((result?.droppedKeys ?? []).map((d) => [d.key, d.message]));
+    // Uploaded rows leave the list; failed and queued ones stay visible.
     setFiles((prev) =>
-      prev.map((f) => {
-        if (!f.key || f.status === "done") return f;
-        if (sentKeys.has(f.key)) return { ...f, status: "done", error: undefined };
-        // Dropped = the server refused it (4xx); its queue file is gone, so
-        // clearing the key lets a retry re-enqueue the source file.
-        if (dropped.has(f.key)) return { ...f, status: "failed", key: undefined, error: dropped.get(f.key) };
-        return { ...f, status: "queued", error: result?.failedError ?? undefined };
-      }),
+      prev
+        .filter((f) => !(f.key && sentKeys.has(f.key)))
+        .map((f) => {
+          if (!f.key || f.status === "done") return f;
+          // Dropped = the server refused it (4xx); its queue file is gone, so
+          // clearing the key lets a retry re-enqueue the source file.
+          if (dropped.has(f.key)) return { ...f, status: "failed", key: undefined, error: dropped.get(f.key) };
+          return { ...f, status: "queued", error: result?.failedError ?? undefined };
+        }),
     );
     setBusy(false);
+    const uploaded = staged.filter((f) => f.key && sentKeys.has(f.key)).length;
+    if (uploaded > 0) {
+      Alert.alert("Upload complete", `${uploaded} document${uploaded === 1 ? "" : "s"} uploaded.`);
+    }
   }, [files]);
 
   const removeFile = useCallback(
@@ -157,7 +188,7 @@ export default function UploadScreen() {
           <Button label="Pick files" kind="ghost" onPress={pick} />
         </View>
         <View style={{ flex: 1 }}>
-          <Button label="Scan" kind="ghost" onPress={scan} />
+          <Button label="Scan" kind="ghost" onPress={() => scan()} />
         </View>
       </Row>
       <FlatList
@@ -175,7 +206,7 @@ export default function UploadScreen() {
                   icon="pencil-outline"
                   size={16}
                   accessibilityLabel={`Rename ${item.name}`}
-                  onPress={() => setRename({ index, text: item.name })}
+                  onPress={() => setRename({ uri: item.uri, text: item.name })}
                 />
               ) : null}
               {item.status !== "uploading" ? (
@@ -200,13 +231,13 @@ export default function UploadScreen() {
         </View>
       ) : null}
       <Portal>
-        <Dialog visible={rename !== null} onDismiss={() => setRename(null)}>
+        <Dialog visible={rename !== null} onDismiss={cancelRename}>
           <Dialog.Title>Document name</Dialog.Title>
           <Dialog.Content>
             <Input label="Name" value={rename?.text ?? ""} onChangeText={(t) => setRename((r) => (r ? { ...r, text: t } : r))} autoFocus />
           </Dialog.Content>
           <Dialog.Actions>
-            <PaperButton onPress={() => setRename(null)}>Cancel</PaperButton>
+            <PaperButton onPress={cancelRename}>Cancel</PaperButton>
             <PaperButton mode="contained" disabled={!rename?.text.trim()} onPress={saveRename}>
               Save
             </PaperButton>

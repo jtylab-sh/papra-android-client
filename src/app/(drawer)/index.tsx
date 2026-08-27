@@ -12,7 +12,6 @@ import { spacing, type AppTheme } from "~/constants/theme";
 import { countCachedDocuments, listCachedDocuments, type CachedDocument } from "~/lib/db";
 import { useOnReconnect } from "~/lib/network";
 import { getDocumentsStatistics, type PapraOrgStats } from "~/lib/papra";
-import { scanDocuments } from "~/lib/pickers";
 import { getSettings, isConnected } from "~/lib/settings";
 import { countOfflineOnDisk, syncMetadata } from "~/lib/sync";
 import { countQueuedUploads } from "~/lib/uploads";
@@ -85,9 +84,9 @@ export default function HomeScreen() {
   // Connectivity came back: refresh without waiting for a user action.
   useOnReconnect(refresh);
 
-  const startScan = useCallback(async () => {
-    const files = await scanDocuments();
-    if (files.length) router.push({ pathname: "/upload", params: { files: JSON.stringify(files) } });
+  const startScan = useCallback(() => {
+    // The upload page owns the whole scan flow (PDF merge + name prompt).
+    router.push({ pathname: "/upload", params: { mode: "scan" } });
   }, []);
 
   const startUpload = useCallback(() => {

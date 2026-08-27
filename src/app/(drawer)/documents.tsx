@@ -41,7 +41,6 @@ import {
   type PapraDocumentView,
   type PapraTag,
 } from "~/lib/papra";
-import { scanDocuments } from "~/lib/pickers";
 import { useOnReconnect } from "~/lib/network";
 import { isPrintCancel, printDocument } from "~/lib/print";
 import { getSettings, isConnected } from "~/lib/settings";
@@ -218,11 +217,9 @@ export default function DocumentsScreen() {
   const [fabOpen, setFabOpen] = useState(false);
   const [booting, setBooting] = useState(true);
 
-  const startScan = useCallback(async () => {
-    // Native UI first; the upload page only opens with results, so cancelling
-    // never leaves an empty page in the back stack.
-    const files = await scanDocuments();
-    if (files.length) router.push({ pathname: "/upload", params: { files: JSON.stringify(files) } });
+  const startScan = useCallback(() => {
+    // The upload page owns the whole scan flow (PDF merge + name prompt).
+    router.push({ pathname: "/upload", params: { mode: "scan" } });
   }, []);
 
   const startUpload = useCallback(() => {
