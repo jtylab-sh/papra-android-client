@@ -16,6 +16,7 @@ import {
 } from "react-native-paper";
 import { Button, Card, KeyValue, Muted, Row } from "../../components/ui";
 import { spacing, type AppTheme } from "../../constants/theme";
+import { requestPinWidget } from "react-native-android-widget";
 import { getAuthClient } from "../../lib/auth";
 import { requestNotificationPermission } from "../../lib/notifications";
 import { createOrganization, listOrganizations, type PapraOrganization } from "../../lib/papra";
@@ -195,6 +196,15 @@ export default function SettingsScreen() {
       setProgress(`Failed: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setSyncing(false);
+    }
+  }, []);
+
+  const pinWidget = useCallback(async (widgetName: "Scan" | "RecentDocuments") => {
+    try {
+      const accepted = await requestPinWidget({ widgetName });
+      if (!accepted) Alert.alert("Not supported", "This launcher does not allow apps to pin widgets.");
+    } catch (e) {
+      Alert.alert("Failed", e instanceof Error ? e.message : String(e));
     }
   }, []);
 
@@ -428,6 +438,22 @@ export default function SettingsScreen() {
             <Switch value={settings[key]} onValueChange={(v: boolean) => toggleNotification(key, v)} />
           </Row>
         ))}
+      </Card>
+
+      <Card>
+        <Text variant="titleMedium">Home-screen widgets</Text>
+        <Muted>
+          Adds the widget through the app — use this when your launcher's widget picker won't place
+          them.
+        </Muted>
+        <Row style={{ marginTop: spacing.sm }}>
+          <View style={{ flex: 1 }}>
+            <Button label="Scan button" kind="ghost" onPress={() => pinWidget("Scan")} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Button label="Recent documents" kind="ghost" onPress={() => pinWidget("RecentDocuments")} />
+          </View>
+        </Row>
       </Card>
 
       <Button label="Sign out" kind="danger" onPress={signOut} />

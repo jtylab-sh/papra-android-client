@@ -47,7 +47,8 @@ project.
   each organization keeps its own offline mirror on the phone, so switching is instant and loses
   nothing.
 - **Home-screen widgets**: a *Scan to Papra* button that jumps straight into the scanner, and a
-  *Recent documents* list fed from the offline mirror (refreshed after every sync; rows open the
+  *Recent documents* list fed from the offline mirror. If your launcher's widget picker refuses to
+  place them, add them from Settings -> Home-screen widgets instead (refreshed after every sync; rows open the
   document).
 - **Notifications** (all opt-in, per-event toggles in Settings; permission asked on first enable):
   new documents found by background sync, repeated sync failures, session expired, a warning
