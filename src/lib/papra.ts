@@ -169,6 +169,37 @@ export async function emptyTrash(): Promise<void> {
   await papraRequest(orgPath(s, "/documents/trash"), { method: "DELETE", settings: s });
 }
 
+export interface PapraDocumentView {
+  id: string;
+  name: string;
+  query: string;
+  description?: string | null;
+}
+
+/** Saved searches ("views" in the Papra web sidebar). Session-only routes. */
+export async function listDocumentViews(): Promise<PapraDocumentView[]> {
+  const s = await getSettings();
+  const json = await papraRequest<{ documentViews: PapraDocumentView[] }>(orgPath(s, "/document-views"), {
+    settings: s,
+  });
+  return json.documentViews ?? [];
+}
+
+export async function createDocumentView(input: { name: string; query: string }): Promise<PapraDocumentView> {
+  const s = await getSettings();
+  const json = await papraRequest<{ documentView: PapraDocumentView }>(orgPath(s, "/document-views"), {
+    method: "POST",
+    body: input,
+    settings: s,
+  });
+  return json.documentView;
+}
+
+export async function deleteDocumentView(viewId: string): Promise<void> {
+  const s = await getSettings();
+  await papraRequest(orgPath(s, `/document-views/${viewId}`), { method: "DELETE", settings: s });
+}
+
 /** Batch move to trash; falls back to one-by-one on servers without the batch route. */
 export async function batchTrashDocuments(documentIds: string[]): Promise<void> {
   const s = await getSettings();

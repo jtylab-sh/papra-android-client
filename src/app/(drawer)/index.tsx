@@ -1,12 +1,30 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Alert, FlatList, RefreshControl, View } from "react-native";
-import { Card, IconButton, Surface, Text, useTheme } from "react-native-paper";
+import { Alert, FlatList, RefreshControl, ScrollView, View } from "react-native";
+import {
+  Button as PaperButton,
+  Card,
+  Chip,
+  Dialog,
+  IconButton,
+  Portal,
+  Surface,
+  Text,
+  TextInput,
+  useTheme,
+} from "react-native-paper";
 import { Input, Muted, Row, TagChip, formatBytes, formatDate } from "../../components/ui";
 import { spacing, type AppTheme } from "../../constants/theme";
 import { countCachedDocuments, getCachedDocument, listCachedDocuments, type CachedDocument } from "../../lib/db";
-import { batchTrashDocuments, listDocuments } from "../../lib/papra";
+import {
+  batchTrashDocuments,
+  createDocumentView,
+  deleteDocumentView,
+  listDocumentViews,
+  listDocuments,
+  type PapraDocumentView,
+} from "../../lib/papra";
 import { getSettings, isConnected } from "../../lib/settings";
 import { syncMetadata, upsertFromSearch } from "../../lib/screens-helpers";
 import { ensureLocalFile } from "../../lib/sync";
@@ -38,6 +56,9 @@ export default function DocumentsScreen() {
         }
         setReady(true);
         loadLocal(search);
+        listDocumentViews()
+          .then((v) => active && setViews(v))
+          .catch(() => {});
         // First run: pull metadata so the list isn't empty.
         if (countCachedDocuments() === 0) {
           syncMetadata()
@@ -113,6 +134,45 @@ export default function DocumentsScreen() {
       return [...prev, ...listCachedDocuments(search, PAGE, prev.length)];
     });
   }, [serverMode, docs.length, search, total, runServerSearch]);
+
+  // --- views (saved searches, like the Papra sidebar) ---
+  const [views, setViews] = useState<PapraDocumentView[]>([]);
+  const [viewName, setViewName] = useState<string | null>(null); // non-null = save dialog open
+  const [savingView, setSavingView] = useState(false);
+
+  const saveView = useCallback(async () => {
+    const name = viewName?.trim();
+    const query = search.trim();
+    if (!name || !query) return;
+    setSavingView(true);
+    try {
+      const created = await createDocumentView({ name, query });
+      setViews((prev) => [...prev, created]);
+      setViewName(null);
+    } catch (e) {
+      Alert.alert("Failed", e instanceof Error ? e.message : String(e));
+    } finally {
+      setSavingView(false);
+    }
+  }, [viewName, search]);
+
+  const confirmDeleteView = useCallback((view: PapraDocumentView) => {
+    Alert.alert("Delete view?", `"${view.name}" — the saved search is removed; documents are untouched.`, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await deleteDocumentView(view.id);
+            setViews((prev) => prev.filter((v) => v.id !== view.id));
+          } catch (e) {
+            Alert.alert("Failed", e instanceof Error ? e.message : String(e));
+          }
+        },
+      },
+    ]);
+  }, []);
 
   // --- multi-select (long press) ---
   const [selected, setSelected] = useState<Set<string> | null>(null);
@@ -194,7 +254,29 @@ export default function DocumentsScreen() {
           autoCapitalize="none"
           autoCorrect={false}
           returnKeyType="search"
+          right={
+            search.trim() ? (
+              <TextInput.Icon icon="bookmark-plus-outline" onPress={() => setViewName("")} forceTextInputFocus={false} />
+            ) : null
+          }
         />
+        {views.length > 0 && !selected ? (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: spacing.sm }}>
+            {views.map((v) => (
+              <Chip
+                key={v.id}
+                compact
+                icon="bookmark-outline"
+                mode={search.trim() === v.query ? "flat" : "outlined"}
+                onPress={() => onSearchChange(v.query)}
+                onLongPress={() => confirmDeleteView(v)}
+                style={{ marginRight: 6 }}
+              >
+                {v.name}
+              </Chip>
+            ))}
+          </ScrollView>
+        ) : null}
       </View>
       <FlatList
         data={docs}
@@ -221,6 +303,28 @@ export default function DocumentsScreen() {
           />
         )}
       />
+      <Portal>
+        <Dialog visible={viewName !== null} onDismiss={() => setViewName(null)}>
+          <Dialog.Title>Save view</Dialog.Title>
+          <Dialog.Content style={{ gap: spacing.sm }}>
+            <Muted>Saves the current search as a view: {search.trim()}</Muted>
+            <TextInput
+              mode="outlined"
+              dense
+              label="Name"
+              value={viewName ?? ""}
+              onChangeText={setViewName}
+              autoFocus
+            />
+          </Dialog.Content>
+          <Dialog.Actions>
+            <PaperButton onPress={() => setViewName(null)}>Cancel</PaperButton>
+            <PaperButton mode="contained" loading={savingView} disabled={!viewName?.trim()} onPress={saveView}>
+              Save
+            </PaperButton>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
     </View>
   );
 }
