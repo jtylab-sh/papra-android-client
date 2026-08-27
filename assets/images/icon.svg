@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- Papra glyph: a folded-corner document sheet with 2 content lines,
+       drawn as cutouts (evenodd holes) so it reads as a solid two-tone
+       shape against whatever sits behind it (green icon bg, or the
+       Android adaptive-icon backgroundColor for the transparent layers).
+       Bounding box fits inside the adaptive-icon safe-zone circle
+       (66% of 1024, radius 338, centered at 512,512). -->
+  <path fill="#ffffff" fill-rule="evenodd" d="
+    M348,252 L602,252 L712,362 L712,736
+    A36,36 0 0 1 676,772
+    L348,772
+    A36,36 0 0 1 312,736
+    L312,288
+    A36,36 0 0 1 348,252
+    Z
+    M384,400 H664 V456 H384 Z
+    M384,508 H624 V564 H384 Z
+  "/>
+  <!-- folded corner flap, inset from the clipped notch so a thin crease gap
+       shows the layer behind -->
+  <path fill="#ffffff" d="M618,268 L696,268 L696,346 Z"/>
+</svg>

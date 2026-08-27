@@ -11,7 +11,7 @@
     "android": {
       "package": "sh.jtylab.papra",
       "adaptiveIcon": {
-        "backgroundColor": "#0d1512",
+        "backgroundColor": "#10b981",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
