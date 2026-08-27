@@ -197,6 +197,40 @@ async function downloadWithRetry(id: string): Promise<void> {
   }
 }
 
+/**
+ * Disk is the only source of truth for "offline": count the blob files that
+ * are actually on the device and belong to a document known from Papra, and
+ * heal the db pointers both ways while at it (file deleted: pointer dropped;
+ * file present: pointer restored). Cheap: one directory listing + one pass.
+ */
+export function countOfflineOnDisk(): number {
+  const onDisk = new Map<string, string>(); // document id -> file uri
+  try {
+    const dir = new Directory(Paths.document, "docs");
+    if (dir.exists) {
+      for (const entry of dir.list()) {
+        if (entry instanceof File) {
+          const id = entry.name.split(".")[0];
+          if (id) onDisk.set(id, entry.uri);
+        }
+      }
+    }
+  } catch {
+    /* unreadable dir = nothing offline */
+  }
+  let count = 0;
+  for (const doc of listCachedDocuments()) {
+    const uri = onDisk.get(doc.id);
+    if (uri) {
+      count++;
+      if (doc.fileUri !== uri) setDocumentFileUri(doc.id, uri);
+    } else if (doc.fileUri) {
+      setDocumentFileUri(doc.id, null);
+    }
+  }
+  return count;
+}
+
 export interface SyncResult {
   skipped?: "not-configured" | "wifi";
   documents: number;
@@ -224,6 +258,7 @@ export async function syncNow(
   }
   const knownIds = opts.background ? new Set(listCachedDocuments().map((d) => d.id)) : null;
   const ids = await syncMetadata(s);
+  countOfflineOnDisk(); // reconcile pointers with the files actually on disk
   if (opts.background && knownIds && knownIds.size > 0) {
     const fresh = ids.filter((docId) => !knownIds.has(docId));
     if (fresh.length > 0) {

@@ -1,6 +1,6 @@
 import * as FileSystemLegacy from "expo-file-system/legacy";
 import * as LocalAuthentication from "expo-local-authentication";
-import { router, useFocusEffect } from "expo-router";
+import { router } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { Alert, ScrollView, View } from "react-native";
 import {
@@ -21,6 +21,7 @@ import { getAuthClient } from "../../lib/auth";
 import { requestNotificationPermission } from "../../lib/notifications";
 import { createOrganization, listOrganizations, type PapraOrganization } from "../../lib/papra";
 import { countCachedDocuments, countOfflineDocuments, getMeta } from "../../lib/db";
+import { countOfflineOnDisk } from "../../lib/sync";
 import { clearSettings, getSettings, saveSettings, type Settings } from "../../lib/settings";
 import {
   applySyncRegistration,
@@ -54,11 +55,6 @@ export default function SettingsScreen() {
   const [progress, setProgress] = useState<string>("");
   const [syncing, setSyncing] = useState(false);
   const lastSyncAt = getMeta("lastSyncAt");
-  const [counts, setCounts] = useState({ offline: 0, total: 0 });
-  const refreshCounts = useCallback(() => {
-    setCounts({ offline: countOfflineDocuments(), total: countCachedDocuments() });
-  }, []);
-  useFocusEffect(refreshCounts);
 
   useEffect(() => {
     getSettings().then((s) => {
@@ -158,7 +154,7 @@ export default function SettingsScreen() {
             onPress: async () => {
               try {
                 await wipeOfflineFiles(settings?.offlineExportDirUri ?? "");
-                refreshCounts();
+                setProgress(""); // re-render; the counter reads the disk
                 Alert.alert("Deleted", "All offline copies were removed from this phone.");
               } catch (e) {
                 Alert.alert("Delete failed", e instanceof Error ? e.message : String(e));
@@ -168,7 +164,7 @@ export default function SettingsScreen() {
         ],
       );
     },
-    [update, settings?.offlineExportDirUri, refreshCounts],
+    [update, settings?.offlineExportDirUri],
   );
 
   const toggleNotification = useCallback(
@@ -208,9 +204,8 @@ export default function SettingsScreen() {
       setProgress(`Failed: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setSyncing(false);
-      refreshCounts();
     }
-  }, [refreshCounts]);
+  }, []);
 
   const pinWidget = useCallback(async (widgetName: "Scan" | "RecentDocuments") => {
     try {
@@ -364,7 +359,7 @@ export default function SettingsScreen() {
           <Button label="Sync now" kind="ghost" onPress={runSync} loading={syncing} />
           {progress ? <Muted>{progress}</Muted> : null}
           <Muted>
-            Offline: {counts.offline} of {counts.total} documents on this phone
+            Offline: {countOfflineOnDisk()} of {countCachedDocuments()} documents on this phone
           </Muted>
           {lastSyncAt ? <Muted>Last sync: {new Date(lastSyncAt).toLocaleString()}</Muted> : null}
         </View>
