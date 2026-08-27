@@ -111,56 +111,42 @@ export function upsertDocuments(docs: PapraDocument[]): void {
   }
 }
 
-export function listCachedDocuments(search = "", limit = -1, offset = 0): CachedDocument[] {
-  const d = getDb();
+/** synced: true = only downloaded, false = only not yet downloaded, undefined = all. */
+function whereClause(search: string, synced?: boolean): { where: string; args: string[] } {
+  const conds: string[] = [];
+  const args: string[] = [];
+  if (search) {
+    conds.push("(name like ? or originalName like ?)");
+    args.push(`%${search}%`, `%${search}%`);
+  }
+  if (synced === true) conds.push("fileUri is not null");
+  if (synced === false) conds.push("fileUri is null");
+  return { where: conds.length ? ` where ${conds.join(" and ")}` : "", args };
+}
+
+export function listCachedDocuments(search = "", limit = -1, offset = 0, synced?: boolean): CachedDocument[] {
   // limit -1 = no limit (SQLite convention); offset only applies with a limit.
-  const rows = search
-    ? d.getAllSync(
-        "select * from documents where name like ? or originalName like ? order by createdAt desc limit ? offset ?",
-        [`%${search}%`, `%${search}%`, limit, offset],
-      )
-    : d.getAllSync("select * from documents order by createdAt desc limit ? offset ?", [limit, offset]);
+  const { where, args } = whereClause(search, synced);
+  const rows = getDb().getAllSync(`select * from documents${where} order by createdAt desc limit ? offset ?`, [
+    ...args,
+    limit,
+    offset,
+  ]);
   return (rows as Record<string, unknown>[]).map(toCached);
+}
+
+export function countCachedDocuments(search = "", synced?: boolean): number {
+  const { where, args } = whereClause(search, synced);
+  const row = getDb().getFirstSync(`select count(*) as n from documents${where}`, args) as { n: number } | null;
+  return row?.n ?? 0;
 }
 
 export function listOfflineDocuments(search = "", limit = -1, offset = 0): CachedDocument[] {
-  const d = getDb();
-  const rows = search
-    ? d.getAllSync(
-        "select * from documents where fileUri is not null and (name like ? or originalName like ?) order by createdAt desc limit ? offset ?",
-        [`%${search}%`, `%${search}%`, limit, offset],
-      )
-    : d.getAllSync("select * from documents where fileUri is not null order by createdAt desc limit ? offset ?", [
-        limit,
-        offset,
-      ]);
-  return (rows as Record<string, unknown>[]).map(toCached);
+  return listCachedDocuments(search, limit, offset, true);
 }
 
 export function countOfflineDocuments(search = ""): number {
-  const d = getDb();
-  const row = (
-    search
-      ? d.getFirstSync(
-          "select count(*) as n from documents where fileUri is not null and (name like ? or originalName like ?)",
-          [`%${search}%`, `%${search}%`],
-        )
-      : d.getFirstSync("select count(*) as n from documents where fileUri is not null")
-  ) as { n: number } | null;
-  return row?.n ?? 0;
-}
-
-export function countCachedDocuments(search = ""): number {
-  const d = getDb();
-  const row = (
-    search
-      ? d.getFirstSync("select count(*) as n from documents where name like ? or originalName like ?", [
-          `%${search}%`,
-          `%${search}%`,
-        ])
-      : d.getFirstSync("select count(*) as n from documents")
-  ) as { n: number } | null;
-  return row?.n ?? 0;
+  return countCachedDocuments(search, true);
 }
 
 export function getCachedDocument(id: string): CachedDocument | null {

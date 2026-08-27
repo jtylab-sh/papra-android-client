@@ -19,7 +19,7 @@ import { spacing, type AppTheme } from "../../constants/theme";
 import { getAuthClient } from "../../lib/auth";
 import { requestNotificationPermission } from "../../lib/notifications";
 import { createOrganization, listOrganizations, type PapraOrganization } from "../../lib/papra";
-import { getMeta } from "../../lib/db";
+import { countCachedDocuments, countOfflineDocuments, getMeta } from "../../lib/db";
 import { clearSettings, getSettings, saveSettings, type Settings } from "../../lib/settings";
 import { applySyncRegistration, syncMetadata, syncNow, wipeLocalData } from "../../lib/sync";
 
@@ -306,6 +306,9 @@ export default function SettingsScreen() {
         <View style={{ marginTop: spacing.md, gap: spacing.sm }}>
           <Button label="Sync now" kind="ghost" onPress={runSync} loading={syncing} />
           {progress ? <Muted>{progress}</Muted> : null}
+          <Muted>
+            Offline: {countOfflineDocuments()} of {countCachedDocuments()} documents on this phone
+          </Muted>
           {lastSyncAt ? <Muted>Last sync: {new Date(lastSyncAt).toLocaleString()}</Muted> : null}
         </View>
       </Card>

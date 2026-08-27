@@ -40,11 +40,16 @@ export default function DocumentsScreen() {
   // Paged reads from the cache — never the whole library at once.
   const PAGE = 30;
   const [total, setTotal] = useState(0);
+  // Filter: only documents whose blob is not on the phone yet (local-only view).
+  const [notSynced, setNotSynced] = useState(false);
 
-  const loadLocal = useCallback((q: string) => {
-    setDocs(listCachedDocuments(q, PAGE, 0));
-    setTotal(countCachedDocuments(q));
-  }, []);
+  const loadLocal = useCallback(
+    (q: string, unsyncedOnly = notSynced) => {
+      setDocs(listCachedDocuments(q, PAGE, 0, unsyncedOnly ? false : undefined));
+      setTotal(countCachedDocuments(q, unsyncedOnly ? false : undefined));
+    },
+    [notSynced],
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -116,9 +121,10 @@ export default function DocumentsScreen() {
       setServerMode(false);
       loadLocal(t); // instant local hits while the server round-trip runs
       if (debounceRef.current) clearTimeout(debounceRef.current);
-      if (t.trim()) debounceRef.current = setTimeout(() => runServerSearch(t.trim()), 350);
+      // The not-synced filter is a purely local view — no server round-trip.
+      if (t.trim() && !notSynced) debounceRef.current = setTimeout(() => runServerSearch(t.trim()), 350);
     },
-    [loadLocal, runServerSearch],
+    [loadLocal, runServerSearch, notSynced],
   );
 
   useEffect(() => () => {
@@ -132,9 +138,9 @@ export default function DocumentsScreen() {
     }
     setDocs((prev) => {
       if (prev.length >= total) return prev;
-      return [...prev, ...listCachedDocuments(search, PAGE, prev.length)];
+      return [...prev, ...listCachedDocuments(search, PAGE, prev.length, notSynced ? false : undefined)];
     });
-  }, [serverMode, docs.length, search, total, runServerSearch]);
+  }, [serverMode, docs.length, search, total, runServerSearch, notSynced]);
 
   const [fabOpen, setFabOpen] = useState(false);
 
@@ -259,8 +265,22 @@ export default function DocumentsScreen() {
           traileringIcon={search.trim() ? "bookmark-plus-outline" : undefined}
           onTraileringIconPress={() => setViewName("")}
         />
-        {views.length > 0 && !selected ? (
+        {!selected ? (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: spacing.sm }}>
+            <Chip
+              compact
+              icon="cloud-off-outline"
+              mode={notSynced ? "flat" : "outlined"}
+              onPress={() => {
+                const next = !notSynced;
+                setNotSynced(next);
+                setServerMode(false);
+                loadLocal(search, next);
+              }}
+              style={{ marginRight: 6 }}
+            >
+              Not synced
+            </Chip>
             {views.map((v) => (
               <Chip
                 key={v.id}
