@@ -5,49 +5,49 @@ import { useCallback, useEffect, useState } from "react";
 import { Alert, ScrollView, View } from "react-native";
 import {
   Button as PaperButton,
-  Chip,
   Dialog,
   Portal,
   RadioButton,
   Switch,
   Text,
-  TextInput,
   useTheme,
 } from "react-native-paper";
-import { Button, Card, KeyValue, Muted, Row } from "../../components/ui";
+import { Button, Card, ChipRow, Input, KeyValue, Muted, Row } from "../../components/ui";
 import { spacing, type AppTheme } from "../../constants/theme";
 import { requestPinWidget } from "react-native-android-widget";
 import { getAuthClient } from "../../lib/auth";
 import { requestNotificationPermission } from "../../lib/notifications";
 import { createOrganization, listOrganizations, type PapraOrganization } from "../../lib/papra";
-import { countCachedDocuments, countOfflineDocuments, getMeta } from "../../lib/db";
+import { countCachedDocuments, getMeta } from "../../lib/db";
 import { countOfflineOnDisk } from "../../lib/sync";
-import { clearSettings, getSettings, saveSettings, type Settings } from "../../lib/settings";
+import { getSettings, saveSettings, type Settings } from "../../lib/settings";
 import {
   applySyncRegistration,
   ensureNoMedia,
+  signOutEverything,
   syncMetadata,
   syncNow,
-  wipeLocalData,
   wipeOfflineFiles,
 } from "../../lib/sync";
 import { appVersion } from "../../lib/version";
 
-const GRACE: { label: string; minutes: number }[] = [
-  { label: "Immediately", minutes: 0 },
-  { label: "1 min", minutes: 1 },
-  { label: "5 min", minutes: 5 },
-  { label: "15 min", minutes: 15 },
-  { label: "1 h", minutes: 60 },
+const GRACE = [
+  { label: "Immediately", value: 0 },
+  { label: "1 min", value: 1 },
+  { label: "5 min", value: 5 },
+  { label: "15 min", value: 15 },
+  { label: "1 h", value: 60 },
 ];
 
-const INTERVALS: { label: string; minutes: number }[] = [
-  { label: "15 min", minutes: 15 },
-  { label: "1 h", minutes: 60 },
-  { label: "6 h", minutes: 360 },
-  { label: "12 h", minutes: 720 },
-  { label: "24 h", minutes: 1440 },
+const INTERVALS = [
+  { label: "15 min", value: 15 },
+  { label: "1 h", value: 60 },
+  { label: "6 h", value: 360 },
+  { label: "12 h", value: 720 },
+  { label: "24 h", value: 1440 },
 ];
+
+const RETENTION = [7, 14, 30, 60, 90].map((days) => ({ label: `${days} days`, value: days }));
 
 export default function SettingsScreen() {
   const theme = useTheme<AppTheme>();
@@ -141,7 +141,7 @@ export default function SettingsScreen() {
     (v: boolean) => {
       update({ syncEnabled: v }, true);
       if (v) return;
-      const n = countOfflineDocuments();
+      const n = countCachedDocuments("", true);
       if (n === 0) return;
       Alert.alert(
         "Delete offline files?",
@@ -223,15 +223,7 @@ export default function SettingsScreen() {
         text: "Sign out",
         style: "destructive",
         onPress: async () => {
-          const s = await getSettings();
-          if (s.serverUrl) {
-            await getAuthClient(s.serverUrl)
-              .signOut()
-              .catch(() => {});
-          }
-          wipeLocalData();
-          await clearSettings();
-          await applySyncRegistration().catch(() => {});
+          await signOutEverything();
           router.replace("/sign-in");
         },
       },
@@ -274,13 +266,7 @@ export default function SettingsScreen() {
             </RadioButton.Group>
             <Row style={{ marginTop: spacing.sm }}>
               <View style={{ flex: 1 }}>
-                <TextInput
-                  mode="outlined"
-                  dense
-                  label="New organization"
-                  value={newOrgName}
-                  onChangeText={setNewOrgName}
-                />
+                <Input label="New organization" value={newOrgName} onChangeText={setNewOrgName} />
               </View>
               <PaperButton mode="contained" loading={orgBusy} disabled={!newOrgName.trim()} onPress={createOrg}>
                 Create
@@ -308,21 +294,11 @@ export default function SettingsScreen() {
             >
               CADENCE (Android decides the exact moment)
             </Text>
-            <Row style={{ flexWrap: "wrap" }}>
-              {INTERVALS.map((opt) => (
-                <Chip
-                  key={opt.minutes}
-                  compact
-                  showSelectedCheck={false}
-                  selected={settings.syncIntervalMinutes === opt.minutes}
-                  mode={settings.syncIntervalMinutes === opt.minutes ? "flat" : "outlined"}
-                  onPress={() => update({ syncIntervalMinutes: opt.minutes }, true)}
-                  style={{ marginRight: 6, marginBottom: 6 }}
-                >
-                  {opt.label}
-                </Chip>
-              ))}
-            </Row>
+            <ChipRow
+              options={INTERVALS}
+              value={settings.syncIntervalMinutes}
+              onSelect={(minutes) => update({ syncIntervalMinutes: minutes }, true)}
+            />
             <Row style={{ justifyContent: "space-between", marginTop: spacing.sm }}>
               <Text variant="bodyLarge">Wi-Fi only</Text>
               <Switch value={settings.syncWifiOnly} onValueChange={(v: boolean) => update({ syncWifiOnly: v })} />
@@ -379,21 +355,11 @@ export default function SettingsScreen() {
             >
               LOCK AFTER LEAVING THE APP FOR
             </Text>
-            <Row style={{ flexWrap: "wrap" }}>
-              {GRACE.map((opt) => (
-                <Chip
-                  key={opt.minutes}
-                  compact
-                  showSelectedCheck={false}
-                  selected={settings.lockGraceMinutes === opt.minutes}
-                  mode={settings.lockGraceMinutes === opt.minutes ? "flat" : "outlined"}
-                  onPress={() => update({ lockGraceMinutes: opt.minutes })}
-                  style={{ marginRight: 6, marginBottom: 6 }}
-                >
-                  {opt.label}
-                </Chip>
-              ))}
-            </Row>
+            <ChipRow
+              options={GRACE}
+              value={settings.lockGraceMinutes}
+              onSelect={(minutes) => update({ lockGraceMinutes: minutes })}
+            />
           </>
         )}
       </Card>
@@ -405,21 +371,12 @@ export default function SettingsScreen() {
           deletedDocumentsRetentionDays). The app can't read it, so set it to match; this only
           affects countdowns shown here, never the server.
         </Muted>
-        <Row style={{ flexWrap: "wrap", marginTop: spacing.sm }}>
-          {[7, 14, 30, 60, 90].map((days) => (
-            <Chip
-              key={days}
-              compact
-              selected={settings.trashRetentionDays === days}
-              showSelectedCheck={false}
-              mode={settings.trashRetentionDays === days ? "flat" : "outlined"}
-              onPress={() => update({ trashRetentionDays: days })}
-              style={{ marginRight: 6, marginBottom: 6 }}
-            >
-              {`${days} days`}
-            </Chip>
-          ))}
-        </Row>
+        <ChipRow
+          style={{ marginTop: spacing.sm }}
+          options={RETENTION}
+          value={settings.trashRetentionDays}
+          onSelect={(days) => update({ trashRetentionDays: days })}
+        />
       </Card>
 
       <Card>

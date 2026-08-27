@@ -5,7 +5,7 @@ import { Searchbar, useTheme } from "react-native-paper";
 import { DocumentRow } from "../../components/document-row";
 import { Muted } from "../../components/ui";
 import { spacing, type AppTheme } from "../../constants/theme";
-import { countOfflineDocuments, listOfflineDocuments, type CachedDocument } from "../../lib/db";
+import { countCachedDocuments, listCachedDocuments, type CachedDocument } from "../../lib/db";
 
 export default function OfflineScreen() {
   const theme = useTheme<AppTheme>();
@@ -16,8 +16,8 @@ export default function OfflineScreen() {
   const PAGE = 30;
 
   const loadLocal = useCallback((q: string) => {
-    setDocs(listOfflineDocuments(q, PAGE, 0));
-    setTotal(countOfflineDocuments(q));
+    setDocs(listCachedDocuments(q, PAGE, 0, true));
+    setTotal(countCachedDocuments(q, true));
   }, []);
 
   useFocusEffect(
@@ -38,7 +38,7 @@ export default function OfflineScreen() {
   const loadMore = useCallback(() => {
     setDocs((prev) => {
       if (prev.length >= total) return prev;
-      return [...prev, ...listOfflineDocuments(search, PAGE, prev.length)];
+      return [...prev, ...listCachedDocuments(search, PAGE, prev.length, true)];
     });
   }, [search, total]);
 

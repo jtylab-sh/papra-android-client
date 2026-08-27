@@ -17,23 +17,14 @@ export function appVersion(): string {
   return Constants.expoConfig?.version ?? "0.0.0";
 }
 
-function newer(a: string, b: string): boolean {
-  const pa = a.split(".").map(Number);
-  const pb = b.split(".").map(Number);
-  for (let i = 0; i < 3; i++) {
-    const d = (pa[i] ?? 0) - (pb[i] ?? 0);
-    if (d !== 0) return d > 0;
-  }
-  return false;
-}
-
 export async function maybePromptUpdate(): Promise<void> {
   try {
     const res = await fetch(RELEASES_LATEST);
     if (!res.ok) return;
     const json = (await res.json()) as { tag_name?: string; html_url?: string };
     const latest = (json.tag_name ?? "").replace(/^v/, "");
-    if (!latest || !newer(latest, appVersion())) return;
+    // Numeric collation orders version segments correctly (1.10.0 > 1.9.0).
+    if (!latest || latest.localeCompare(appVersion(), undefined, { numeric: true }) <= 0) return;
     if ((await SecureStore.getItemAsync(PROMPTED_KEY)) === latest) return;
     await SecureStore.setItemAsync(PROMPTED_KEY, latest);
     Alert.alert(`Update available: v${latest}`, `You have v${appVersion()}. Download the new APK from GitHub?`, [

@@ -4,6 +4,7 @@ import type { PropsWithChildren } from "react";
 import { Pressable, StyleSheet, View, type ViewStyle } from "react-native";
 import {
   Button as PaperButton,
+  Chip,
   Surface,
   Text,
   TextInput,
@@ -101,6 +102,37 @@ export function TagChip({ name, color, onClose }: { name: string; color?: string
 
 export function Row({ children, style }: PropsWithChildren<{ style?: ViewStyle }>) {
   return <View style={[styles.row, style]}>{children}</View>;
+}
+
+/** Single-select chip row (sync cadence, lock grace, trash retention). */
+export function ChipRow<T extends string | number>({
+  options,
+  value,
+  onSelect,
+  style,
+}: {
+  options: { label: string; value: T }[];
+  value: T;
+  onSelect: (value: T) => void;
+  style?: ViewStyle;
+}) {
+  return (
+    <Row style={{ flexWrap: "wrap", ...style }}>
+      {options.map((opt) => (
+        <Chip
+          key={String(opt.value)}
+          compact
+          showSelectedCheck={false}
+          selected={opt.value === value}
+          mode={opt.value === value ? "flat" : "outlined"}
+          onPress={() => onSelect(opt.value)}
+          style={{ marginRight: 6, marginBottom: 6 }}
+        >
+          {opt.label}
+        </Chip>
+      ))}
+    </Row>
+  );
 }
 
 export function KeyValue({ label, value }: { label: string; value: string }) {

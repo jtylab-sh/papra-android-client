@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Alert, FlatList, RefreshControl, View } from "react-native";
-import { Button, Dialog, FAB, IconButton, Portal, TextInput, useTheme } from "react-native-paper";
-import { Card, Muted, Row, TagChip } from "../../components/ui";
+import { Button, Dialog, FAB, IconButton, Portal, useTheme } from "react-native-paper";
+import { Card, Input, Muted, Row, TagChip } from "../../components/ui";
 import { spacing, type AppTheme } from "../../constants/theme";
 import { createTag, deleteTag, listTags, updateTag, type PapraTag } from "../../lib/papra";
 
@@ -125,16 +125,12 @@ export default function TagsScreen() {
         <Dialog visible={draft !== null} onDismiss={() => setDraft(null)}>
           <Dialog.Title>{draft?.id ? "Edit tag" : "New tag"}</Dialog.Title>
           <Dialog.Content style={{ gap: spacing.sm }}>
-            <TextInput
-              mode="outlined"
-              dense
+            <Input
               label="Name"
               value={draft?.name ?? ""}
               onChangeText={(t) => setDraft((d) => (d ? { ...d, name: t } : d))}
             />
-            <TextInput
-              mode="outlined"
-              dense
+            <Input
               label="Description (helps auto-tagging)"
               value={draft?.description ?? ""}
               onChangeText={(t) => setDraft((d) => (d ? { ...d, description: t } : d))}

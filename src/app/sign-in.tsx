@@ -6,30 +6,8 @@ import { Button, Input, Muted, Title } from "../components/ui";
 import { spacing, type AppTheme } from "../constants/theme";
 import { getAuthClient } from "../lib/auth";
 import { listOrganizations, type PapraOrganization } from "../lib/papra";
-import { normalizeServerUrl, saveSettings, type Settings } from "../lib/settings";
+import { DEFAULTS, normalizeServerUrl, saveSettings, type Settings } from "../lib/settings";
 import { applySyncRegistration } from "../lib/sync";
-
-/** Settings candidate used before anything is persisted. */
-function draftSettings(serverUrl: string): Settings {
-  return {
-    serverUrl,
-    accountEmail: "",
-    organizationId: "",
-    organizationName: "",
-    syncEnabled: false,
-    syncIntervalMinutes: 720,
-    syncWifiOnly: true,
-    biometricLock: false,
-    lockGraceMinutes: 5,
-    offlineExportDirUri: "",
-    trashRetentionDays: 30,
-    notifyNewDocuments: false,
-    notifySyncFailures: false,
-    notifySessionExpired: false,
-    notifyTrashPurge: false,
-    notifySyncProgress: false,
-  };
-}
 
 type Step = "credentials" | "totp" | "org";
 
@@ -86,7 +64,7 @@ export default function SignInScreen() {
         setStep("totp");
         return;
       }
-      await pickOrgsOrFinish({ ...draftSettings(url), accountEmail: email.trim() });
+      await pickOrgsOrFinish({ ...DEFAULTS, serverUrl: url, accountEmail: email.trim() });
     });
 
   const verifyTotp = () =>
@@ -96,7 +74,7 @@ export default function SignInScreen() {
       // trustDevice: skip the TOTP prompt on this phone for future sign-ins.
       const { error: totpError } = await client.twoFactor.verifyTotp({ code: code.trim(), trustDevice: true });
       if (totpError) throw new Error(totpError.message ?? "Invalid code");
-      await pickOrgsOrFinish({ ...draftSettings(url), accountEmail: email.trim() });
+      await pickOrgsOrFinish({ ...DEFAULTS, serverUrl: url, accountEmail: email.trim() });
     });
 
   if (step === "org") {

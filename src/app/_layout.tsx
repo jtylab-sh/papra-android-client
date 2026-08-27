@@ -8,10 +8,9 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { PaperProvider } from "react-native-paper";
 import { Button, Muted, Screen, Title } from "../components/ui";
 import { useAppTheme } from "../constants/theme";
-import { getAuthClient } from "../lib/auth";
-import { clearSettings, getSettings } from "../lib/settings";
+import { getSettings } from "../lib/settings";
 // Side effect: defines the background sync task at module scope.
-import { applySyncRegistration, wipeLocalData } from "../lib/sync";
+import { signOutEverything } from "../lib/sync";
 import { maybePromptUpdate } from "../lib/version";
 
 export default function RootLayout() {
@@ -67,15 +66,7 @@ export default function RootLayout() {
         text: "Sign out",
         style: "destructive",
         onPress: async () => {
-          const s = await getSettings();
-          if (s.serverUrl) {
-            await getAuthClient(s.serverUrl)
-              .signOut()
-              .catch(() => {});
-          }
-          wipeLocalData();
-          await clearSettings();
-          await applySyncRegistration().catch(() => {});
+          await signOutEverything();
           setLocked(false);
           router.replace("/sign-in");
         },

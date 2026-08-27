@@ -38,7 +38,7 @@ export function setActiveOrg(orgId: string): void {
   activeOrgId = orgId;
 }
 
-export function activeDbName(): string {
+function activeDbName(): string {
   return activeOrgId ? `papra-${activeOrgId}.db` : "papra.db";
 }
 
@@ -139,14 +139,6 @@ export function countCachedDocuments(search = "", synced?: boolean): number {
   const { where, args } = whereClause(search, synced);
   const row = getDb().getFirstSync(`select count(*) as n from documents${where}`, args) as { n: number } | null;
   return row?.n ?? 0;
-}
-
-export function listOfflineDocuments(search = "", limit = -1, offset = 0): CachedDocument[] {
-  return listCachedDocuments(search, limit, offset, true);
-}
-
-export function countOfflineDocuments(search = ""): number {
-  return countCachedDocuments(search, true);
 }
 
 export function getCachedDocument(id: string): CachedDocument | null {

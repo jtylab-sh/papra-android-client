@@ -11,13 +11,18 @@ import {
   Searchbar,
   Surface,
   Text,
-  TextInput,
   useTheme,
 } from "react-native-paper";
 import { DocumentRow } from "../../components/document-row";
-import { Muted } from "../../components/ui";
+import { Input, Muted } from "../../components/ui";
 import { spacing, type AppTheme } from "../../constants/theme";
-import { countCachedDocuments, getCachedDocument, listCachedDocuments, type CachedDocument } from "../../lib/db";
+import {
+  countCachedDocuments,
+  getCachedDocument,
+  listCachedDocuments,
+  upsertDocuments,
+  type CachedDocument,
+} from "../../lib/db";
 import {
   batchTrashDocuments,
   createDocumentView,
@@ -28,8 +33,7 @@ import {
 } from "../../lib/papra";
 import { pickFiles, scanDocuments } from "../../lib/pickers";
 import { getSettings, isConnected } from "../../lib/settings";
-import { syncMetadata, upsertFromSearch } from "../../lib/screens-helpers";
-import { ensureLocalFile } from "../../lib/sync";
+import { ensureLocalFile, syncMetadata } from "../../lib/sync";
 
 export default function DocumentsScreen() {
   const theme = useTheme<AppTheme>();
@@ -105,7 +109,7 @@ export default function DocumentsScreen() {
   const runServerSearch = useCallback(async (q: string, pageIndex = 0) => {
     try {
       const { documents, documentsCount } = await listDocuments({ searchQuery: q, pageIndex, pageSize: SEARCH_PAGE });
-      upsertFromSearch(documents);
+      upsertDocuments(documents);
       // Re-read through the cache so rows carry offline state, server order kept.
       const found = documents.map((d) => getCachedDocument(d.id)).filter((d): d is CachedDocument => d !== null);
       setDocs((prev) => (pageIndex === 0 ? found : [...prev, ...found]));
@@ -354,14 +358,7 @@ export default function DocumentsScreen() {
           <Dialog.Title>Save view</Dialog.Title>
           <Dialog.Content style={{ gap: spacing.sm }}>
             <Muted>Saves the current search as a view: {search.trim()}</Muted>
-            <TextInput
-              mode="outlined"
-              dense
-              label="Name"
-              value={viewName ?? ""}
-              onChangeText={setViewName}
-              autoFocus
-            />
+            <Input label="Name" value={viewName ?? ""} onChangeText={setViewName} autoFocus />
           </Dialog.Content>
           <Dialog.Actions>
             <PaperButton onPress={() => setViewName(null)}>Cancel</PaperButton>

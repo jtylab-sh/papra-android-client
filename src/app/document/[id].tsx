@@ -12,11 +12,10 @@ import {
   List,
   Portal,
   Text,
-  TextInput,
   useTheme,
 } from "react-native-paper";
 import { MimeIcon } from "../../components/document-row";
-import { Card, KeyValue, Muted, Row, TagChip, formatBytes, formatDate } from "../../components/ui";
+import { Card, Input, KeyValue, Muted, Row, TagChip, formatBytes, formatDate } from "../../components/ui";
 import { spacing, type AppTheme } from "../../constants/theme";
 import { getCachedDocument, upsertDocuments, type CachedDocument } from "../../lib/db";
 import {
@@ -257,14 +256,7 @@ export default function DocumentScreen() {
         <Dialog visible={renameValue !== null} onDismiss={() => setRenameValue(null)}>
           <Dialog.Title>Rename document</Dialog.Title>
           <Dialog.Content>
-            <TextInput
-              mode="outlined"
-              dense
-              label="Name"
-              value={renameValue ?? ""}
-              onChangeText={setRenameValue}
-              autoFocus
-            />
+            <Input label="Name" value={renameValue ?? ""} onChangeText={setRenameValue} autoFocus />
           </Dialog.Content>
           <Dialog.Actions>
             <PaperButton onPress={() => setRenameValue(null)}>Cancel</PaperButton>

@@ -21,7 +21,8 @@ import {
   clearCache,
   clearFileUris,
 } from "./db";
-import { getSettings, isConnected, type Settings } from "./settings";
+import { getAuthClient } from "./auth";
+import { clearSettings, getSettings, isConnected, type Settings } from "./settings";
 import { updateRecentDocumentsWidget } from "../widgets/widgets";
 import {
   clearSyncNotification,
@@ -143,7 +144,6 @@ async function listExportNames(exportDirUri: string): Promise<Set<string> | null
 
 async function exportCopy(id: string, exportDirUri: string, existingNames: Set<string> | null): Promise<void> {
   if (!exportDirUri) return;
-  await ensureNoMedia(exportDirUri);
   const cached = getCachedDocument(id);
   if (!cached?.fileUri) return;
   const metaKey = `exported:${id}`;
@@ -173,12 +173,7 @@ async function exportCopy(id: string, exportDirUri: string, existingNames: Set<s
  */
 export async function localFileNamedForUser(id: string): Promise<string> {
   const uri = await ensureLocalFile(id);
-  const cached = getCachedDocument(id);
-  const ext = extensionFor(cached!);
-  const base = (cached!.name || `document.${ext}`)
-    .replace(/[\\/:*?"<>|\x00-\x1f]+/g, "_")
-    .slice(0, 120);
-  const named = base.toLowerCase().endsWith(`.${ext}`) ? base : `${base}.${ext}`;
+  const named = displayFileName(getCachedDocument(id)!);
   const dir = new Directory(Paths.cache, "share");
   if (!dir.exists) dir.create({ intermediates: true });
   const target = new File(dir, named);
@@ -275,6 +270,7 @@ export async function syncNow(
   // when the user leaves the app. Never from background tasks — Android 12+
   // forbids starting a foreground service from the background.
   const exportNames = s.offlineExportDirUri ? await listExportNames(s.offlineExportDirUri) : null;
+  if (s.offlineExportDirUri) await ensureNoMedia(s.offlineExportDirUri).catch(() => {});
   const useService = !opts.background && s.notifySyncProgress;
   const plainProgress = Boolean(opts.background) && s.notifySyncProgress;
   if (useService) await startSyncService().catch(() => {});
@@ -300,7 +296,6 @@ export async function syncNow(
     if (plainProgress) await clearSyncNotification();
   }
   setMeta("lastSyncAt", new Date().toISOString());
-  setMeta("lastSyncResult", JSON.stringify({ documents: ids.length, downloaded, failed, lastError }));
   return { documents: ids.length, downloaded, failed, lastError: lastError || undefined };
 }
 
@@ -387,6 +382,19 @@ export async function wipeOfflineFiles(exportDirUri: string): Promise<void> {
   } catch {
     /* fine */
   }
+}
+
+/** Full sign-out: server session (best effort), settings, mirrors, blobs, background job. */
+export async function signOutEverything(): Promise<void> {
+  const s = await getSettings();
+  if (s.serverUrl) {
+    await getAuthClient(s.serverUrl)
+      .signOut()
+      .catch(() => {});
+  }
+  wipeLocalData();
+  await clearSettings();
+  await applySyncRegistration().catch(() => {});
 }
 
 /** Sign-out: drop every organization's mirror (all papra*.db files) and every blob. */

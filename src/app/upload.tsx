@@ -51,10 +51,10 @@ export default function UploadScreen() {
       } catch {
         /* malformed share payload — user can still pick manually */
       }
-    } else if (params.mode === "pick" || params.mode === "scan") {
-      // Deep-link launch (Scan widget): open the native UI straight away, and
+    } else if (params.mode === "scan") {
+      // Deep-link launch (Scan widget): open the scanner straight away, and
       // if the user cancels there, leave — never strand them on an empty page.
-      (params.mode === "pick" ? pick() : scan()).then((got) => {
+      scan().then((got) => {
         if (!got) router.back();
       });
     }

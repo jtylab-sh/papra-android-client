@@ -37,7 +37,7 @@ export interface Settings {
   notifySyncProgress: boolean;
 }
 
-const DEFAULTS: Settings = {
+export const DEFAULTS: Settings = {
   serverUrl: "",
   accountEmail: "",
   organizationId: "",
