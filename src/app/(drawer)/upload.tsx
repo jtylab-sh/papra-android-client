@@ -1,7 +1,7 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Alert, FlatList, View } from "react-native";
-import { Button as PaperButton, Dialog, IconButton, Portal, Text, useTheme } from "react-native-paper";
+import { ActivityIndicator, Button as PaperButton, Dialog, IconButton, Portal, Text, useTheme } from "react-native-paper";
 import { Button, Card, Input, Muted, Row } from "~/components/ui";
 import { spacing, type AppTheme } from "~/constants/theme";
 import { enqueueUpload, flushUploads, removeQueuedUpload } from "~/lib/uploads";
@@ -22,6 +22,7 @@ export default function UploadScreen() {
   const params = useLocalSearchParams<{ files?: string; mode?: string }>();
   const [files, setFiles] = useState<PendingFile[]>([]);
   const [busy, setBusy] = useState(false);
+  const [generating, setGenerating] = useState(false);
   const [rename, setRename] = useState<{ uri: string; text: string } | null>(null);
   // Set to a row's uri when cancelling its name prompt should discard the
   // scan and leave (deep-linked scans, per the scanner-cancel behavior).
@@ -68,7 +69,15 @@ export default function UploadScreen() {
   }, []);
 
   const scan = useCallback(async (leaveOnCancel = false): Promise<boolean> => {
-    const picked = await scanDocuments(); // one merged PDF per scan session
+    // The PDF merge after the scanner closes takes a moment; the indicator
+    // is invisible behind the native scanner and shows only during it.
+    setGenerating(true);
+    let picked: Awaited<ReturnType<typeof scanDocuments>>;
+    try {
+      picked = await scanDocuments(); // one merged PDF per scan session
+    } finally {
+      setGenerating(false);
+    }
     if (!picked.length) return false;
     const row = { ...picked[0], status: "pending" as const };
     setFiles((prev) => [...prev, row]);
@@ -191,6 +200,12 @@ export default function UploadScreen() {
           <Button label="Scan" kind="ghost" onPress={() => scan()} />
         </View>
       </Row>
+      {generating ? (
+        <Row style={{ marginBottom: spacing.sm }}>
+          <ActivityIndicator size="small" />
+          <Muted>Generating PDF…</Muted>
+        </Row>
+      ) : null}
       <FlatList
         data={files}
         keyExtractor={(f, i) => `${f.uri}-${i}`}
