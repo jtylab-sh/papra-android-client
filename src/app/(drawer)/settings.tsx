@@ -1,5 +1,6 @@
 import * as FileSystemLegacy from "expo-file-system/legacy";
 import * as LocalAuthentication from "expo-local-authentication";
+import * as ScreenCapture from "expo-screen-capture";
 import { useCallback, useEffect, useState } from "react";
 import { Alert, ScrollView, View } from "react-native";
 import {
@@ -104,6 +105,9 @@ export default function SettingsScreen() {
         }
       }
       update({ biometricLock: value });
+      // FLAG_SECURE rides the lock: no screenshots and no document content
+      // in the recents thumbnail while the lock is on.
+      (value ? ScreenCapture.preventScreenCaptureAsync() : ScreenCapture.allowScreenCaptureAsync()).catch(() => {});
     },
     [update],
   );

@@ -24,6 +24,7 @@
     "expo-print": "^57.0.1",
     "expo-quick-actions": "^6.0.2",
     "expo-router": "~57.0.16",
+    "expo-screen-capture": "~57.0.2",
     "expo-secure-store": "~57.0.1",
     "expo-share-intent": "^8.0.1",
     "expo-sharing": "~57.0.15",

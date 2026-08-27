@@ -13,13 +13,29 @@ import * as SecureStore from "expo-secure-store";
 
 type AuthClient = ReturnType<typeof buildClient>;
 
+/**
+ * SecureStore prefix derived from the server host, so a session cookie for
+ * server A is never attached to requests aimed at server B.
+ */
+function storagePrefixFor(serverUrl: string): string {
+  const host = serverUrl.replace(/^https?:\/\//i, "").replace(/\/.*$/, "");
+  return `papra_${host.replace(/[^A-Za-z0-9._-]/g, "_")}`;
+}
+
+/** Every SecureStore key that may hold session material for this server. */
+export function authStorageKeys(serverUrl: string): string[] {
+  const p = storagePrefixFor(serverUrl);
+  // The unkeyed "papra" prefix is the pre-1.13 slot; clear it too.
+  return [`${p}_cookie`, `${p}_session_data`, "papra_cookie", "papra_session_data"];
+}
+
 function buildClient(serverUrl: string) {
   return createAuthClient({
     baseURL: serverUrl,
     plugins: [
       expoClient({
         scheme: "papra",
-        storagePrefix: "papra",
+        storagePrefix: storagePrefixFor(serverUrl),
         storage: SecureStore,
       }),
       // Papra's server always registers better-auth's twoFactor plugin; this is

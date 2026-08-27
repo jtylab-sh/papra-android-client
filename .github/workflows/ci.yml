@@ -164,14 +164,10 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # node/tool stderr appears BEFORE gradle's FAILURE block — include it.
-          ln=$(grep -n "FAILURE: Build failed" /tmp/gradle.log | head -1 | cut -d: -f1)
-          if [ -n "$ln" ]; then
-            start=$(( ln > 150 ? ln - 150 : 1 ))
-            excerpt=$(sed -n "${start},$((ln + 15))p" /tmp/gradle.log)
-          else
-            excerpt=$(tail -160 /tmp/gradle.log)
-          fi
+          # Error lines only: chunks we repost ourselves bypass GitHub's
+          # secret masking, so publish nothing beyond the failure signal.
+          excerpt=$(grep -E "FAILURE:|What went wrong|Caused by:|> Task [^ ]+ FAILED|error( TS[0-9]+)?:|ERROR" /tmp/gradle.log | head -80)
+          [ -z "$excerpt" ] && excerpt=$(tail -40 /tmp/gradle.log)
           {
             echo '## Gradle failure'
             echo '```'

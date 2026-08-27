@@ -24,7 +24,10 @@ export async function printDocument(id: string): Promise<void> {
     const b64 = await FileSystemLegacy.readAsStringAsync(uri, {
       encoding: FileSystemLegacy.EncodingType.Base64,
     });
-    await Print.printAsync({ html: `<img src="data:${mime};base64,${b64}" style="width:100%" />` });
+    // mimeType comes from the server; strip anything that could break out
+    // of the attribute before it is interpolated into HTML.
+    const safeMime = mime.replace(/[^\w/+.-]/g, "");
+    await Print.printAsync({ html: `<img src="data:${safeMime};base64,${b64}" style="width:100%" />` });
     return;
   }
   throw new Error("Printing supports PDF and image documents only.");

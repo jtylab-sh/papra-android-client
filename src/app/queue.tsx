@@ -31,7 +31,10 @@ export default function QueueScreen() {
   const uploadNow = useCallback(async () => {
     setBusy(true);
     try {
-      await flushUploads();
+      const result = await flushUploads();
+      if (result?.failedError) {
+        Alert.alert("Upload failed", result.failedError);
+      }
     } finally {
       setBusy(false);
       load();

@@ -5,6 +5,7 @@ import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useRef, useState } from "react";
 import * as Network from "expo-network";
 import * as QuickActions from "expo-quick-actions";
+import * as ScreenCapture from "expo-screen-capture";
 import { useQuickActionRouting, type RouterAction } from "expo-quick-actions/router";
 import { Alert, AppState, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -82,6 +83,7 @@ export default function RootLayout() {
     getSettings().then((s) => {
       if (!mounted) return;
       setLocked(s.biometricLock);
+      if (s.biometricLock) ScreenCapture.preventScreenCaptureAsync().catch(() => {});
     });
     const sub = AppState.addEventListener("change", (state) => {
       if (state === "background") {

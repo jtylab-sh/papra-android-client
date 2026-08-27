@@ -64,23 +64,31 @@ export async function enqueueUpload(file: { uri: string; name: string; mimeType?
   await FS.writeAsStringAsync(`${DIR}${base}.json`, JSON.stringify(meta));
 }
 
-/** Send everything in the queue. Safe to call any time; no-op when empty. */
+export interface FlushResult {
+  sent: number;
+  dropped: number;
+  /** Message of the failure that stopped the flush, null when none did. */
+  failedError: string | null;
+}
+
+/** Send everything in the queue. Safe to call any time; null when already running. */
 let flushing = false; // foreground + reconnect + manual can overlap
-export async function flushUploads(): Promise<void> {
-  if (flushing) return;
+export async function flushUploads(): Promise<FlushResult | null> {
+  if (flushing) return null;
   flushing = true;
   try {
-    await doFlush();
+    return await doFlush();
   } finally {
     flushing = false;
   }
 }
 
-async function doFlush(): Promise<void> {
+async function doFlush(): Promise<FlushResult> {
   const names = await FS.readDirectoryAsync(DIR).catch(() => [] as string[]);
   const entries = names.filter((n) => !n.endsWith(".json"));
   let sent = 0;
   let dropped = 0;
+  let failedError: string | null = null;
   for (const n of entries) {
     const metaRaw = await FS.readAsStringAsync(`${DIR}${n}.json`).catch(() => null);
     const meta: QueuedMeta = metaRaw ? JSON.parse(metaRaw) : { name: n };
@@ -91,8 +99,12 @@ async function doFlush(): Promise<void> {
       // 4xx = the server refused this file (duplicate, too big) — retrying
       // can never succeed, so drop it. Anything else (offline, 5xx): stop
       // and keep the rest for the next flush.
-      if (e instanceof ApiError && e.status >= 400 && e.status < 500) dropped++;
-      else break;
+      if (e instanceof ApiError && e.status >= 400 && e.status < 500) {
+        dropped++;
+      } else {
+        failedError = e instanceof Error ? e.message : String(e);
+        break;
+      }
     }
     await FS.deleteAsync(`${DIR}${n}`, { idempotent: true });
     await FS.deleteAsync(`${DIR}${n}.json`, { idempotent: true });
@@ -104,4 +116,5 @@ async function doFlush(): Promise<void> {
   if (dropped > 0) {
     ToastAndroid.show(`${dropped} queued upload${dropped === 1 ? "" : "s"} rejected by the server`, ToastAndroid.LONG);
   }
+  return { sent, dropped, failedError };
 }

@@ -4,7 +4,7 @@ import { FlatList, View } from "react-native";
 import { Button as PaperButton, Dialog, IconButton, Portal, Text, useTheme } from "react-native-paper";
 import { Button, Card, Input, Muted, Row } from "~/components/ui";
 import { spacing, type AppTheme } from "~/constants/theme";
-import { ApiError, uploadDocument } from "~/lib/papra";
+import { isOfflineError, uploadDocument } from "~/lib/papra";
 import { enqueueUpload } from "~/lib/uploads";
 import { pickFiles, scanDocuments } from "~/lib/pickers";
 import { syncMetadata } from "~/lib/sync";
@@ -93,8 +93,9 @@ export default function UploadScreen() {
         await uploadDocument(files[i]);
         setFiles((prev) => prev.map((f, j) => (j === i ? { ...f, status: "done" } : f)));
       } catch (e) {
-        if (e instanceof ApiError && e.status === 0) {
-          // Offline: park the file in the queue, it uploads on reconnect.
+        if (isOfflineError(e)) {
+          // Genuinely offline: park the file in the queue, it uploads on
+          // reconnect. Any other failure shows its real cause on the row.
           await enqueueUpload(files[i]).catch(() => {});
           setFiles((prev) => prev.map((f, j) => (j === i ? { ...f, status: "queued" } : f)));
           continue;

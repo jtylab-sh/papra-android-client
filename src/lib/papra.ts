@@ -85,6 +85,15 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * True only for the "device reports no connectivity" failure. That is the one
+ * case where parking an upload in the queue is right; every other status-0
+ * failure (timeout, refused, DNS) must surface its cause to the user.
+ */
+export function isOfflineError(e: unknown): boolean {
+  return e instanceof ApiError && e.status === 0 && e.message === "You are offline";
+}
+
 async function authHeaders(s: Settings): Promise<Record<string, string>> {
   const cookie = await getAuthCookie(s.serverUrl);
   return cookie ? { Cookie: cookie } : {};

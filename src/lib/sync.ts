@@ -7,6 +7,7 @@ import * as BackgroundTask from "expo-background-task";
 import { Directory, File, Paths } from "expo-file-system";
 import * as FileSystemLegacy from "expo-file-system/legacy";
 import * as Network from "expo-network";
+import * as SecureStore from "expo-secure-store";
 import * as TaskManager from "expo-task-manager";
 import {
   ApiError,
@@ -28,7 +29,7 @@ import {
   clearCache,
   clearFileUris,
 } from "~/lib/db";
-import { getAuthClient } from "~/lib/auth";
+import { authStorageKeys, getAuthClient } from "~/lib/auth";
 import { getSettings, isConnected, saveSettings, type Settings } from "~/lib/settings";
 import { updateRecentDocumentsWidget } from "~/widgets/widgets";
 import {
@@ -473,6 +474,11 @@ export async function signOutEverything(): Promise<void> {
     await getAuthClient(s.serverUrl)
       .signOut()
       .catch(() => {});
+    // An offline sign-out never reaches the server, so the stored cookie
+    // would stay valid. Delete the session material unconditionally.
+    for (const key of authStorageKeys(s.serverUrl)) {
+      await SecureStore.deleteItemAsync(key).catch(() => {});
+    }
   }
   wipeLocalData();
   // Only the account is forgotten — device preferences (sync, biometric lock,

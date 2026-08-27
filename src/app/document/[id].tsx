@@ -42,7 +42,10 @@ import { ensureLocalFile, localFileNamedForUser, removeLocalCopy } from "~/lib/s
 export default function DocumentScreen() {
   const theme = useTheme<AppTheme>();
   const dateFormat = useDateFormat();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id: rawId } = useLocalSearchParams<{ id: string }>();
+  // Deep links (papra://document/<id>) are attacker-supplied; only
+  // server-shaped ids may reach API paths.
+  const id = rawId && /^[A-Za-z0-9_-]+$/.test(rawId) ? rawId : "";
   const [cached, setCached] = useState<CachedDocument | null>(null);
   const [live, setLive] = useState<PapraDocument | null>(null);
   const [busy, setBusy] = useState<string | null>(null);

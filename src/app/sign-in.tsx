@@ -1,7 +1,7 @@
 import { Stack, router } from "expo-router";
 import { useCallback, useState, useEffect } from "react";
 import { KeyboardAvoidingView, ScrollView, View } from "react-native";
-import { Card, Text, useTheme } from "react-native-paper";
+import { Card, Checkbox, Text, useTheme } from "react-native-paper";
 import { Button, Input, Muted, Title } from "~/components/ui";
 import { spacing, type AppTheme } from "~/constants/theme";
 import { getAuthClient } from "~/lib/auth";
@@ -18,6 +18,7 @@ export default function SignInScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
+  const [trustDevice, setTrustDevice] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [orgs, setOrgs] = useState<PapraOrganization[]>([]);
@@ -78,8 +79,7 @@ export default function SignInScreen() {
     run(async () => {
       const url = normalizeServerUrl(serverUrl);
       const client = getAuthClient(url);
-      // trustDevice: skip the TOTP prompt on this phone for future sign-ins.
-      const { error: totpError } = await client.twoFactor.verifyTotp({ code: code.trim(), trustDevice: true });
+      const { error: totpError } = await client.twoFactor.verifyTotp({ code: code.trim(), trustDevice });
       if (totpError) throw new Error(totpError.message ?? "Invalid code");
       await pickOrgsOrFinish({ ...DEFAULTS, serverUrl: url, accountEmail: email.trim() });
     });
@@ -146,6 +146,13 @@ export default function SignInScreen() {
               value={code}
               onChangeText={setCode}
               autoFocus
+            />
+            <Checkbox.Item
+              label="Trust this device - skip the code here next time"
+              position="leading"
+              labelVariant="bodyMedium"
+              status={trustDevice ? "checked" : "unchecked"}
+              onPress={() => setTrustDevice((v) => !v)}
             />
             {error ? <Text style={{ color: theme.colors.error }}>{error}</Text> : null}
             <Button label="Verify" onPress={verifyTotp} loading={busy} disabled={code.trim().length !== 6} />
