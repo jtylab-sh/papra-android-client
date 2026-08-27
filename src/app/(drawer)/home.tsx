@@ -6,14 +6,15 @@ import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import { FlatList, RefreshControl, View } from "react-native";
 import { Text, useTheme } from "react-native-paper";
-import { DocumentRow } from "../../components/document-row";
-import { Button, Card, Muted, Row, formatBytes } from "../../components/ui";
-import { spacing, type AppTheme } from "../../constants/theme";
-import { countCachedDocuments, getMeta, listCachedDocuments, type CachedDocument } from "../../lib/db";
-import { getDocumentsStatistics, type PapraOrgStats } from "../../lib/papra";
-import { pickFiles, scanDocuments } from "../../lib/pickers";
-import { getSettings, isConnected } from "../../lib/settings";
-import { countOfflineOnDisk, syncMetadata } from "../../lib/sync";
+import { DocumentRow } from "~/components/document-row";
+import { Button, Card, Muted, Row, formatBytes } from "~/components/ui";
+import { spacing, type AppTheme } from "~/constants/theme";
+import { countCachedDocuments, listCachedDocuments, type CachedDocument } from "~/lib/db";
+import { useOnReconnect } from "~/lib/network";
+import { getDocumentsStatistics, type PapraOrgStats } from "~/lib/papra";
+import { pickFiles, scanDocuments } from "~/lib/pickers";
+import { getSettings, isConnected } from "~/lib/settings";
+import { countOfflineOnDisk, syncMetadata } from "~/lib/sync";
 
 export default function HomeScreen() {
   const theme = useTheme<AppTheme>();
@@ -60,6 +61,9 @@ export default function HomeScreen() {
     }
   }, [loadLocal]);
 
+  // Connectivity came back: refresh without waiting for a user action.
+  useOnReconnect(refresh);
+
   const startScan = useCallback(async () => {
     const files = await scanDocuments();
     if (files.length) router.push({ pathname: "/upload", params: { files: JSON.stringify(files) } });
@@ -71,8 +75,6 @@ export default function HomeScreen() {
   }, []);
 
   if (!ready) return <View style={{ flex: 1, backgroundColor: theme.colors.background }} />;
-
-  const lastSyncAt = getMeta("lastSyncAt");
 
   return (
     <FlatList
@@ -99,11 +101,6 @@ export default function HomeScreen() {
               <Stat label="In trash" value={stats ? String(stats.deletedDocumentsCount) : "-"} />
               <Stat label="Offline" value={String(countOfflineOnDisk())} />
             </Row>
-            {lastSyncAt ? (
-              <View style={{ marginTop: spacing.sm }}>
-                <Muted>Last sync: {new Date(lastSyncAt).toLocaleString()}</Muted>
-              </View>
-            ) : null}
           </Card>
           <Text variant="titleMedium">Recent documents</Text>
         </View>

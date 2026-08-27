@@ -1,6 +1,6 @@
 import type { WidgetTaskHandlerProps } from "react-native-android-widget";
-import { getSettings } from "../lib/settings";
-import { renderWidgetByName } from "./widgets";
+import { getSettings } from "~/lib/settings";
+import { renderWidgetByName } from "~/widgets/widgets";
 
 export async function widgetTaskHandler(props: WidgetTaskHandlerProps): Promise<void> {
   // Side effect: selects the active organization's database for the render.

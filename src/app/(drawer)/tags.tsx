@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { Alert, FlatList, RefreshControl, View } from "react-native";
 import { Button, Dialog, FAB, IconButton, Portal, useTheme } from "react-native-paper";
-import { Card, Input, Muted, Row, TagChip } from "../../components/ui";
-import { spacing, type AppTheme } from "../../constants/theme";
-import { createTag, deleteTag, listTags, updateTag, type PapraTag } from "../../lib/papra";
+import { Card, Input, Muted, Row, TagChip } from "~/components/ui";
+import { spacing, type AppTheme } from "~/constants/theme";
+import { useOnReconnect } from "~/lib/network";
+import { createTag, deleteTag, listTags, updateTag, type PapraTag } from "~/lib/papra";
 
 /** Papra's default tag palette-ish presets — server wants #RRGGBB. */
 const COLORS = [
@@ -41,6 +42,8 @@ export default function TagsScreen() {
   useEffect(() => {
     load();
   }, [load]);
+
+  useOnReconnect(load);
 
   const save = useCallback(async () => {
     if (!draft || !draft.name.trim()) return;

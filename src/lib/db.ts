@@ -4,7 +4,7 @@
  * `fileUri` points there once the sync job has downloaded a document.
  */
 import * as SQLite from "expo-sqlite";
-import type { PapraDocument, PapraTag } from "./papra";
+import type { PapraDocument, PapraTag } from "~/lib/papra";
 
 export interface CachedDocument {
   id: string;

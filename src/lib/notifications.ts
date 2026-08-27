@@ -7,7 +7,7 @@
  */
 import * as Notifications from "expo-notifications";
 import notifee, { AndroidForegroundServiceType, AndroidImportance, EventType } from "react-native-notify-kit";
-import { getSettings } from "./settings";
+import { getSettings } from "~/lib/settings";
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({

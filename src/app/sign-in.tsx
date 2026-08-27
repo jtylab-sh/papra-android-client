@@ -2,12 +2,12 @@ import { Stack, router } from "expo-router";
 import { useCallback, useState } from "react";
 import { KeyboardAvoidingView, ScrollView, View } from "react-native";
 import { Card, Text, useTheme } from "react-native-paper";
-import { Button, Input, Muted, Title } from "../components/ui";
-import { spacing, type AppTheme } from "../constants/theme";
-import { getAuthClient } from "../lib/auth";
-import { listOrganizations, type PapraOrganization } from "../lib/papra";
-import { DEFAULTS, normalizeServerUrl, saveSettings, type Settings } from "../lib/settings";
-import { applySyncRegistration } from "../lib/sync";
+import { Button, Input, Muted, Title } from "~/components/ui";
+import { spacing, type AppTheme } from "~/constants/theme";
+import { getAuthClient } from "~/lib/auth";
+import { listOrganizations, type PapraOrganization } from "~/lib/papra";
+import { DEFAULTS, normalizeServerUrl, saveSettings, type Settings } from "~/lib/settings";
+import { applySyncRegistration } from "~/lib/sync";
 
 type Step = "credentials" | "totp" | "org";
 

@@ -7,15 +7,16 @@
 import { useCallback, useEffect, useState } from "react";
 import { Alert, FlatList, RefreshControl, View } from "react-native";
 import { Button, Dialog, FAB, IconButton, Portal, Text, useTheme } from "react-native-paper";
-import { Card, ChipRow, Input, Muted, Row } from "../../components/ui";
-import { spacing, type AppTheme } from "../../constants/theme";
+import { Card, ChipRow, Input, Muted, Row } from "~/components/ui";
+import { spacing, type AppTheme } from "~/constants/theme";
+import { useOnReconnect } from "~/lib/network";
 import {
   createCustomProperty,
   deleteCustomProperty,
   listCustomProperties,
   updateCustomProperty,
   type PapraCustomPropertyDefinition,
-} from "../../lib/papra";
+} from "~/lib/papra";
 
 /** Creatable types. Relation types need entity pickers and are left to the web app. */
 const TYPES: { label: string; value: PapraCustomPropertyDefinition["type"] }[] = [
@@ -63,6 +64,8 @@ export default function PropertiesScreen() {
   useEffect(() => {
     load();
   }, [load]);
+
+  useOnReconnect(load);
 
   const needsOptions = draft && !draft.id && (draft.type === "select" || draft.type === "multi_select");
 

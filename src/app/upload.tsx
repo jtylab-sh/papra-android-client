@@ -2,11 +2,11 @@ import { Stack, router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { FlatList, View } from "react-native";
 import { Text, useTheme } from "react-native-paper";
-import { Button, Card, Muted, Row } from "../components/ui";
-import { spacing, type AppTheme } from "../constants/theme";
-import { uploadDocument } from "../lib/papra";
-import { pickFiles, scanDocuments } from "../lib/pickers";
-import { syncMetadata } from "../lib/sync";
+import { Button, Card, Muted, Row } from "~/components/ui";
+import { spacing, type AppTheme } from "~/constants/theme";
+import { uploadDocument } from "~/lib/papra";
+import { pickFiles, scanDocuments } from "~/lib/pickers";
+import { syncMetadata } from "~/lib/sync";
 
 interface PendingFile {
   uri: string;

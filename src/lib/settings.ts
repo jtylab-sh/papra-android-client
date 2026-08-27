@@ -2,7 +2,7 @@
  * App settings, stored in SecureStore (everything is small strings).
  */
 import * as SecureStore from "expo-secure-store";
-import { setActiveOrg } from "./db";
+import { setActiveOrg } from "~/lib/db";
 
 export interface Settings {
   serverUrl: string; // normalized, no trailing slash
@@ -37,6 +37,18 @@ export interface Settings {
   notifySyncProgress: boolean;
   /** opt-in GitHub release check on start; off by default (Obtainium/store users) */
   updateCheckEnabled: boolean;
+  /** how dates render across the app; "system" follows the phone's locale */
+  dateFormat: DateFormat;
+}
+
+export type DateFormat = "system" | "dmy" | "mdy" | "ymd";
+
+// Mirrors the persisted setting so the synchronous date formatter (used in
+// every list row) never needs to await SecureStore.
+let activeDateFormat: DateFormat = "system";
+
+export function getActiveDateFormat(): DateFormat {
+  return activeDateFormat;
 }
 
 export const DEFAULTS: Settings = {
@@ -57,6 +69,7 @@ export const DEFAULTS: Settings = {
   notifyTrashPurge: false,
   notifySyncProgress: false,
   updateCheckEnabled: false,
+  dateFormat: "system",
 };
 
 const KEY = "papra.settings";
@@ -70,6 +83,7 @@ export async function getSettings(): Promise<Settings> {
     settings = { ...DEFAULTS };
   }
   setActiveOrg(settings.organizationId);
+  activeDateFormat = settings.dateFormat;
   return settings;
 }
 
@@ -78,6 +92,7 @@ export async function saveSettings(patch: Partial<Settings>): Promise<Settings> 
   if (next.serverUrl) next.serverUrl = normalizeServerUrl(next.serverUrl);
   await SecureStore.setItemAsync(KEY, JSON.stringify(next));
   setActiveOrg(next.organizationId);
+  activeDateFormat = next.dateFormat;
   return next;
 }
 

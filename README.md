@@ -45,38 +45,35 @@ project.
   collapsible extracted-text / details sections.
 - **Trash** like the web app: restore, delete forever, empty trash — every delete is confirmed with
   the 30-day retention notice, and trash rows show the time left until permanent deletion.
-- **Offline sync job**: optionally mirror every document to the phone on a schedule (15 min – 24 h,
-  Wi-Fi-only option) using Android WorkManager; an Offline tab lists what's on the phone, offline
-  documents are marked with a cloud icon, the Documents list can filter to not-yet-synced documents,
-  Settings shows how many documents are offline vs on the server, and copies can additionally be
-  exported to a folder you pick (visible in your file manager; the folder gets a `.nomedia` marker so
-  synced images don't flood the phone's gallery, and files you delete from it are re-exported on
-  the next sync). Turning sync off offers to delete all offline copies from the phone.
-  Syncs are **incremental** (only missing files download), **pause instead of failing when the
-  phone goes offline** and resume when connectivity returns, can be **paused manually** (Pause
-  button next to Sync now) and continue where they left off, and **pick up documents added while
-  the sync runs**. Every document page also has a per-document offline toggle: download one
-  document, or tap the cloud icon to remove its offline copy.
+- **Offline mirror**: optionally sync every document to the phone on a schedule (15 min – 24 h,
+  Wi-Fi-only option, Android WorkManager). Syncs are **incremental**, **pause and resume around
+  connectivity changes**, can be **paused manually** and continue where they left off, pick up
+  documents added mid-sync, and manual syncs keep running in a foreground service with a live
+  progress notification when you switch apps. An Offline tab lists what's on the phone, list rows
+  carry a synced / not-synced cloud icon, the Documents list filters to not-yet-synced, Settings
+  counts offline vs server documents, and each document page has its own download / remove-offline
+  toggle. Copies can additionally be **exported to a folder you pick** — browsable in any file
+  manager, kept out of the photo gallery, and self-healing if files are deleted from it. Turning
+  sync off offers to delete all offline copies.
 - **Organizations**: switch between your Papra organizations or create a new one from Settings —
   each organization keeps its own offline mirror on the phone, so switching is instant and loses
   nothing.
 - **Home-screen widgets**: a *Scan to Papra* button that jumps straight into the scanner, and a
-  *Recent documents* list fed from the offline mirror. If your launcher's widget picker refuses to
-  place them, add them from Settings -> Home-screen widgets instead (refreshed after every sync; rows open the
-  document).
+  *Recent documents* list fed from the offline mirror (refreshed after every sync; rows open the
+  document). Add them from the launcher's widget picker or from Settings -> Home-screen widgets.
 - **Notifications** (all opt-in, per-event toggles in Settings; permission asked on first enable):
   new documents found by background sync, repeated sync failures, session expired, a warning
   when trashed documents are within 3 days of permanent deletion, and a live sync-progress
   notification (manual and scheduled background syncs). Tapping a notification opens the matching
   page: sync progress and sync failures land in Settings, new documents in the list, trash
   warnings in Trash.
-- **Sync survives leaving the app**: with the sync-progress notification enabled, a manual sync
-  runs inside an Android foreground service (`dataSync`), so all documents keep downloading with a
-  progress notification even when you switch apps.
 - **Home page**: quick Scan/Upload actions, organization statistics from the server (document
-  count, size, trash) plus the offline count and last sync time, and the 20 most recent documents.
-- **Offline banner**: a red strip at the top of the app whenever the phone has no connectivity,
-  so cached data is clearly labeled as such.
+  count, size, trash) plus the offline count, and the 20 most recent documents.
+- **Offline awareness**: a banner at the top whenever the phone has no connectivity, a small
+  "You are offline" toast on any action that needs the server, and an automatic refresh of every
+  page the moment connectivity returns.
+- **Configurable date format** (Settings -> Date format): system locale, DD/MM/YYYY, MM/DD/YYYY
+  or YYYY-MM-DD, applied everywhere dates appear.
 - **Biometric lock** (fingerprint / face) with a configurable grace period (default 5 min), an
   auto-opening prompt, and sign-out from the lock screen.
 - **Version + update check**: the app version shows at the bottom of Settings; an **opt-in**

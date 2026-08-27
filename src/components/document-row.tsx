@@ -6,9 +6,9 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { View } from "react-native";
 import { Text, TouchableRipple, useTheme } from "react-native-paper";
-import { spacing, type AppTheme } from "../constants/theme";
-import type { CachedDocument } from "../lib/db";
-import { formatBytes, formatDate } from "./ui";
+import { spacing, type AppTheme } from "~/constants/theme";
+import type { CachedDocument } from "~/lib/db";
+import { formatBytes, formatDate } from "~/components/ui";
 
 type IconName = keyof typeof MaterialCommunityIcons.glyphMap;
 type Tone = "primary" | "secondary" | "tertiary";

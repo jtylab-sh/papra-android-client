@@ -12,15 +12,15 @@ import {
   Text,
   useTheme,
 } from "react-native-paper";
-import { Button, Card, ChipRow, Input, KeyValue, Muted, Row } from "../../components/ui";
-import { spacing, type AppTheme } from "../../constants/theme";
+import { Button, Card, ChipRow, Input, KeyValue, Muted, Row } from "~/components/ui";
+import { spacing, type AppTheme } from "~/constants/theme";
 import { requestPinWidget } from "react-native-android-widget";
-import { getAuthClient } from "../../lib/auth";
-import { requestNotificationPermission } from "../../lib/notifications";
-import { createOrganization, listOrganizations, type PapraOrganization } from "../../lib/papra";
-import { countCachedDocuments, getMeta } from "../../lib/db";
-import { countOfflineOnDisk } from "../../lib/sync";
-import { getSettings, saveSettings, type Settings } from "../../lib/settings";
+import { getAuthClient } from "~/lib/auth";
+import { requestNotificationPermission } from "~/lib/notifications";
+import { createOrganization, listOrganizations, type PapraOrganization } from "~/lib/papra";
+import { countCachedDocuments, getMeta } from "~/lib/db";
+import { countOfflineOnDisk } from "~/lib/sync";
+import { getSettings, saveSettings, type Settings } from "~/lib/settings";
 import {
   applySyncRegistration,
   ensureNoMedia,
@@ -29,8 +29,8 @@ import {
   syncMetadata,
   syncNow,
   wipeOfflineFiles,
-} from "../../lib/sync";
-import { appVersion } from "../../lib/version";
+} from "~/lib/sync";
+import { appVersion } from "~/lib/version";
 
 const GRACE = [
   { label: "Immediately", value: 0 },
@@ -49,6 +49,13 @@ const INTERVALS = [
 ];
 
 const RETENTION = [7, 14, 30, 60, 90].map((days) => ({ label: `${days} days`, value: days }));
+
+const DATE_FORMATS: { label: string; value: Settings["dateFormat"] }[] = [
+  { label: "System", value: "system" },
+  { label: "DD/MM/YYYY", value: "dmy" },
+  { label: "MM/DD/YYYY", value: "mdy" },
+  { label: "YYYY-MM-DD", value: "ymd" },
+];
 
 export default function SettingsScreen() {
   const theme = useTheme<AppTheme>();
@@ -432,6 +439,17 @@ export default function SettingsScreen() {
             <Button label="Recent documents" kind="ghost" onPress={() => pinWidget("RecentDocuments")} />
           </View>
         </Row>
+      </Card>
+
+      <Card>
+        <Text variant="titleMedium">Date format</Text>
+        <Muted>How dates are shown everywhere in the app.</Muted>
+        <ChipRow
+          style={{ marginTop: spacing.sm }}
+          options={DATE_FORMATS}
+          value={settings.dateFormat}
+          onSelect={(dateFormat) => update({ dateFormat })}
+        />
       </Card>
 
       <Card>

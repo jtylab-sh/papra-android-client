@@ -14,11 +14,11 @@ import {
   Text,
   useTheme,
 } from "react-native-paper";
-import { MimeIcon } from "../../components/document-row";
-import { Card, Input, KeyValue, Muted, Row, TagChip, formatBytes, formatDate } from "../../components/ui";
-import { spacing, type AppTheme } from "../../constants/theme";
-import { getCachedDocument, upsertDocuments, type CachedDocument } from "../../lib/db";
-import { ImageViewer } from "../../components/image-viewer";
+import { MimeIcon } from "~/components/document-row";
+import { Card, Input, KeyValue, Muted, Row, TagChip, formatBytes, formatDate } from "~/components/ui";
+import { spacing, type AppTheme } from "~/constants/theme";
+import { getCachedDocument, upsertDocuments, type CachedDocument } from "~/lib/db";
+import { ImageViewer } from "~/components/image-viewer";
 import {
   addTagToDocument,
   clearDocumentPropertyValue,
@@ -32,9 +32,10 @@ import {
   type PapraCustomProperty,
   type PapraDocument,
   type PapraTag,
-} from "../../lib/papra";
-import { isPrintCancel, printDocument } from "../../lib/print";
-import { ensureLocalFile, localFileNamedForUser, removeLocalCopy } from "../../lib/sync";
+} from "~/lib/papra";
+import { useOnReconnect } from "~/lib/network";
+import { isPrintCancel, printDocument } from "~/lib/print";
+import { ensureLocalFile, localFileNamedForUser, removeLocalCopy } from "~/lib/sync";
 
 export default function DocumentScreen() {
   const theme = useTheme<AppTheme>();
@@ -60,6 +61,8 @@ export default function DocumentScreen() {
   useEffect(() => {
     reload();
   }, [reload]);
+
+  useOnReconnect(reload);
 
   // --- tag editing (server required; buttons no-op offline with an alert) ---
   const [tagPicker, setTagPicker] = useState<PapraTag[] | null>(null);

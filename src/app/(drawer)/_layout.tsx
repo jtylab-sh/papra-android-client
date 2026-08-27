@@ -2,7 +2,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Drawer } from "expo-router/drawer";
 import { type ColorValue } from "react-native";
 import { useTheme } from "react-native-paper";
-import { type AppTheme } from "../../constants/theme";
+import { type AppTheme } from "~/constants/theme";
 
 type IconName = keyof typeof MaterialCommunityIcons.glyphMap;
 

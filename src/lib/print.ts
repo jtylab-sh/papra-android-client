@@ -1,8 +1,8 @@
 /** Print a document through the Android system print dialog (expo-print). */
 import * as FileSystemLegacy from "expo-file-system/legacy";
 import * as Print from "expo-print";
-import { getCachedDocument } from "./db";
-import { ensureLocalFile } from "./sync";
+import { getCachedDocument } from "~/lib/db";
+import { ensureLocalFile } from "~/lib/sync";
 
 /** True for the rejection expo-print throws when the user closes the dialog. */
 export function isPrintCancel(e: unknown): boolean {

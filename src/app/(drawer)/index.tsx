@@ -17,16 +17,16 @@ import {
   Text,
   useTheme,
 } from "react-native-paper";
-import { DocumentRow } from "../../components/document-row";
-import { Input, Muted } from "../../components/ui";
-import { spacing, type AppTheme } from "../../constants/theme";
+import { DocumentRow } from "~/components/document-row";
+import { Input, Muted } from "~/components/ui";
+import { spacing, type AppTheme } from "~/constants/theme";
 import {
   countCachedDocuments,
   getCachedDocument,
   listCachedDocuments,
   upsertDocuments,
   type CachedDocument,
-} from "../../lib/db";
+} from "~/lib/db";
 import {
   batchTagsDocuments,
   batchTrashDocuments,
@@ -38,11 +38,12 @@ import {
   trashDocument,
   type PapraDocumentView,
   type PapraTag,
-} from "../../lib/papra";
-import { pickFiles, scanDocuments } from "../../lib/pickers";
-import { isPrintCancel, printDocument } from "../../lib/print";
-import { getSettings, isConnected } from "../../lib/settings";
-import { ensureLocalFile, localFileNamedForUser, syncMetadata } from "../../lib/sync";
+} from "~/lib/papra";
+import { pickFiles, scanDocuments } from "~/lib/pickers";
+import { useOnReconnect } from "~/lib/network";
+import { isPrintCancel, printDocument } from "~/lib/print";
+import { getSettings, isConnected } from "~/lib/settings";
+import { ensureLocalFile, localFileNamedForUser, syncMetadata } from "~/lib/sync";
 
 const SORTS = [
   { label: "Newest first", field: "createdAt", order: "desc" },
@@ -130,6 +131,9 @@ export default function DocumentsScreen() {
       setRefreshing(false);
     }
   }, [loadLocal, search]);
+
+  // Connectivity came back: refresh without waiting for a user action.
+  useOnReconnect(refresh);
 
   /**
    * Server search, Papra grammar (AND/OR/NOT, -term, "phrases", tag:/name:/

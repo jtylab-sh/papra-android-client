@@ -7,13 +7,14 @@ import * as Network from "expo-network";
 import { Alert, AppState, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { PaperProvider, Text } from "react-native-paper";
-import { Button, Muted, Screen, Title } from "../components/ui";
-import { useAppTheme } from "../constants/theme";
-import { wireNotificationNavigation } from "../lib/notifications";
-import { getSettings } from "../lib/settings";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Button, Muted, Screen, Title } from "~/components/ui";
+import { useAppTheme } from "~/constants/theme";
+import { wireNotificationNavigation } from "~/lib/notifications";
+import { getSettings } from "~/lib/settings";
 // Side effect: defines the background sync task at module scope.
-import { signOutEverything } from "../lib/sync";
-import { maybePromptUpdate } from "../lib/version";
+import { signOutEverything } from "~/lib/sync";
+import { maybePromptUpdate } from "~/lib/version";
 
 export default function RootLayout() {
   const appTheme = useAppTheme();
@@ -107,14 +108,24 @@ export default function RootLayout() {
 
   // One provider around both branches: the lock screen is Paper-themed too.
   const network = Network.useNetworkState();
-  const offline = network.isConnected === false;
+  // Connected-but-unvalidated (no real internet) counts as offline too.
+  const offline = network.isConnected === false || network.isInternetReachable === false;
+  // Edge-to-edge: without the top inset the banner hides behind the status bar.
+  const insets = useSafeAreaInsets();
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <PaperProvider theme={appTheme}>
       <StatusBar style="light" />
       {offline ? (
-        <View style={{ backgroundColor: appTheme.colors.errorContainer, paddingVertical: 4, alignItems: "center" }}>
+        <View
+          style={{
+            backgroundColor: appTheme.colors.errorContainer,
+            paddingTop: insets.top + 2,
+            paddingBottom: 5,
+            alignItems: "center",
+          }}
+        >
           <Text variant="labelSmall" style={{ color: appTheme.colors.onErrorContainer }}>
             Offline - showing cached data
           </Text>

@@ -6,7 +6,7 @@
  * Static dark palette: widgets can't use the runtime MD3 theme.
  */
 import { FlexWidget, ListWidget, TextWidget, requestWidgetUpdate } from "react-native-android-widget";
-import { listCachedDocuments, type CachedDocument } from "../lib/db";
+import { listCachedDocuments, type CachedDocument } from "~/lib/db";
 
 const BG = "#131a18";
 const TEXT = "#e7edeb";

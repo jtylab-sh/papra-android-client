@@ -8,7 +8,14 @@ import { Directory, File, Paths } from "expo-file-system";
 import * as FileSystemLegacy from "expo-file-system/legacy";
 import * as Network from "expo-network";
 import * as TaskManager from "expo-task-manager";
-import { ApiError, listDeletedDocuments, listDocuments, documentFileUrl, type PapraDocument } from "./papra";
+import {
+  ApiError,
+  listDeletedDocuments,
+  listDocuments,
+  documentFileUrl,
+  notifyIfOffline,
+  type PapraDocument,
+} from "~/lib/papra";
 import {
   getCachedDocument,
   getMeta,
@@ -20,10 +27,10 @@ import {
   upsertDocuments,
   clearCache,
   clearFileUris,
-} from "./db";
-import { getAuthClient } from "./auth";
-import { clearSettings, getSettings, isConnected, type Settings } from "./settings";
-import { updateRecentDocumentsWidget } from "../widgets/widgets";
+} from "~/lib/db";
+import { getAuthClient } from "~/lib/auth";
+import { clearSettings, getSettings, isConnected, type Settings } from "~/lib/settings";
+import { updateRecentDocumentsWidget } from "~/widgets/widgets";
 import {
   clearSyncNotification,
   notifyNewDocuments,
@@ -33,7 +40,7 @@ import {
   startSyncService,
   stopSyncService,
   updateSyncProgress,
-} from "./notifications";
+} from "~/lib/notifications";
 
 export const SYNC_TASK = "papra-sync";
 
@@ -92,7 +99,13 @@ export async function ensureLocalFile(id: string): Promise<string> {
   const file = new File(docsDir(), `${id}.${extensionFor(cached)}`);
   if (file.exists) file.delete();
   const task = File.createDownloadTask(url, file, { headers });
-  await task.downloadAsync();
+  try {
+    await task.downloadAsync();
+  } catch (e) {
+    // Downloads bypass papraRequest; give the same offline toast here.
+    await notifyIfOffline();
+    throw e;
+  }
   setDocumentFileUri(id, file.uri);
   return file.uri;
 }

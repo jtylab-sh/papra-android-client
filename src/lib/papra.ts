@@ -3,8 +3,32 @@
  *
  * Auth is the better-auth session cookie.
  */
-import { getAuthCookie } from "./auth";
-import { getSettings, type Settings } from "./settings";
+import * as Network from "expo-network";
+import { AppState, ToastAndroid } from "react-native";
+import { getAuthCookie } from "~/lib/auth";
+import { getSettings, type Settings } from "~/lib/settings";
+
+let lastOfflineToastAt = 0;
+
+/**
+ * The one offline notifier for every network-needing user action: when the
+ * device is offline, show a small toast (throttled to one per burst, and only
+ * while the app is in the foreground so background syncs stay silent).
+ * Returns whether the device is offline.
+ */
+export async function notifyIfOffline(): Promise<boolean> {
+  const state = await Network.getNetworkStateAsync().catch(() => null);
+  const offline = state?.isConnected === false || state?.isInternetReachable === false;
+  if (offline && AppState.currentState === "active" && Date.now() - lastOfflineToastAt > 3000) {
+    lastOfflineToastAt = Date.now();
+    try {
+      ToastAndroid.show("You are offline - this action needs a connection", ToastAndroid.SHORT);
+    } catch {
+      /* toast is best effort */
+    }
+  }
+  return offline;
+}
 
 export interface PapraTag {
   id: string;
@@ -91,6 +115,8 @@ export async function papraRequest<T = unknown>(path: string, opts: RequestOptio
   try {
     res = await fetch(url.toString(), { method: opts.method ?? "GET", headers, body, credentials: "omit" });
   } catch (cause) {
+    // Every screen action funnels through here, so this one check covers them all.
+    if (await notifyIfOffline()) throw new ApiError(0, "You are offline");
     throw new ApiError(0, `Cannot reach ${s.serverUrl}`);
   }
   if (!res.ok) {

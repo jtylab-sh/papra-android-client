@@ -1,17 +1,18 @@
 import { useCallback, useEffect, useState } from "react";
 import { Alert, FlatList, RefreshControl, View } from "react-native";
 import { Text, useTheme } from "react-native-paper";
-import { Button, Card, Muted, Row, formatDate } from "../../components/ui";
-import { spacing, type AppTheme } from "../../constants/theme";
+import { Button, Card, Muted, Row, formatDate } from "~/components/ui";
+import { spacing, type AppTheme } from "~/constants/theme";
 import {
   deleteDocumentForever,
   emptyTrash,
   listDeletedDocuments,
   restoreDocument,
   type PapraDocument,
-} from "../../lib/papra";
-import { getSettings } from "../../lib/settings";
-import { syncMetadata } from "../../lib/sync";
+} from "~/lib/papra";
+import { useOnReconnect } from "~/lib/network";
+import { getSettings } from "~/lib/settings";
+import { syncMetadata } from "~/lib/sync";
 
 function retentionSuffix(deletedAt: string | null | undefined, retentionDays: number) {
   if (!deletedAt) return "";
@@ -53,6 +54,8 @@ export default function TrashScreen() {
   useEffect(() => {
     load();
   }, [load]);
+
+  useOnReconnect(load);
 
   const act = useCallback(
     async (action: () => Promise<void>) => {

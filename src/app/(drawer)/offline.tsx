@@ -2,11 +2,11 @@ import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import { FlatList, RefreshControl, View } from "react-native";
 import { Searchbar, useTheme } from "react-native-paper";
-import { DocumentRow } from "../../components/document-row";
-import { Button, Muted } from "../../components/ui";
-import { spacing, type AppTheme } from "../../constants/theme";
-import { countCachedDocuments, listCachedDocuments, type CachedDocument } from "../../lib/db";
-import { syncMetadata } from "../../lib/sync";
+import { DocumentRow } from "~/components/document-row";
+import { Button, Muted } from "~/components/ui";
+import { spacing, type AppTheme } from "~/constants/theme";
+import { countCachedDocuments, listCachedDocuments, type CachedDocument } from "~/lib/db";
+import { syncMetadata } from "~/lib/sync";
 
 export default function OfflineScreen() {
   const theme = useTheme<AppTheme>();
