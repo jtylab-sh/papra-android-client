@@ -114,9 +114,11 @@ jobs:
       # persists ~/.gradle/caches between runs).
       - name: Speed up native build
         run: |
+          # NO org.gradle.parallel: expo's autolinking runs a node exec per
+          # project at configuration time; parallel evaluation races them on
+          # shared mirror directories and node exits 1 (probe ran clean solo).
           printf '%s\n' \
             'reactNativeArchitectures=arm64-v8a' \
-            'org.gradle.parallel=true' \
             'org.gradle.caching=true' >> android/gradle.properties
       - name: Decode keystore
         env:
@@ -149,18 +151,7 @@ jobs:
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           set -o pipefail
-          {
-            # Probe: the exact node command Expo's gradle autolinking runs at
-            # configuration time (its stderr is swallowed by gradle on failure).
-            echo "--- autolinking probe ---"
-            ( cd android && node --no-warnings --eval "require('expo/bin/autolinking')" \
-                expo-modules-autolinking mirror-kotlin-inline-modules \
-                --kotlin-files-mirror-directory "$(pwd)/../node_modules/expo/android/src/main/java/inline/modules/" \
-                --inline-modules-list-directory "$(pwd)/../node_modules/expo/android/build/inline/modules/" \
-                --watched-directories-serialized "[]" ) \
-              && echo "--- probe OK ---" || echo "--- probe FAILED: exit $? ---"
-            cd android && ./gradlew --no-daemon --build-cache --parallel --stacktrace assembleRelease
-          } 2>&1 | tee /tmp/gradle.log
+          cd android && ./gradlew --no-daemon --build-cache --stacktrace assembleRelease 2>&1 | tee /tmp/gradle.log
       # Job logs are admin-only via the API. Publish the failure excerpt as a
       # commit comment (public, readable via the REST API) and in the step summary.
       - name: Surface gradle failure
