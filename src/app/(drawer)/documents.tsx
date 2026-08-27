@@ -343,7 +343,11 @@ export default function DocumentsScreen() {
   const [selected, setSelected] = useState<Set<string> | null>(null);
   const [massProgress, setMassProgress] = useState("");
 
+  // Anchor for range selection: the last row toggled individually.
+  const lastTouched = useRef<string | null>(null);
+
   const toggleSelect = useCallback((docId: string) => {
+    lastTouched.current = docId;
     setSelected((prev) => {
       const next = new Set(prev ?? []);
       if (next.has(docId)) next.delete(docId);
@@ -351,6 +355,33 @@ export default function DocumentsScreen() {
       return next.size === 0 ? null : next;
     });
   }, []);
+
+  // Long-press while already selecting: select the whole visible range
+  // between the anchor row and this one (standard multi-select behavior).
+  const rangeSelect = useCallback(
+    (docId: string) => {
+      const anchor = lastTouched.current;
+      if (selected === null || anchor === null || anchor === docId) {
+        toggleSelect(docId);
+        return;
+      }
+      const ids = docs.map((d) => d.id);
+      const a = ids.indexOf(anchor);
+      const b = ids.indexOf(docId);
+      if (a === -1 || b === -1) {
+        toggleSelect(docId);
+        return;
+      }
+      const [lo, hi] = a < b ? [a, b] : [b, a];
+      lastTouched.current = docId;
+      setSelected((prev) => {
+        const next = new Set(prev ?? []);
+        for (const id of ids.slice(lo, hi + 1)) next.add(id);
+        return next;
+      });
+    },
+    [selected, docs, toggleSelect],
+  );
 
   // The hardware/gesture back button leaves selection mode instead of the screen.
   useEffect(() => {
@@ -474,17 +505,21 @@ export default function DocumentsScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
       {selected ? (
-        <Surface elevation={2} style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: spacing.sm }}>
-          <IconButton icon="close" onPress={() => setSelected(null)} />
-          <Text variant="titleSmall" style={{ flex: 1 }}>
-            {massProgress || `${selected.size} selected`}
-          </Text>
-          <IconButton icon="select-all" disabled={!!massProgress} onPress={selectAll} />
-          <IconButton icon="tag-multiple-outline" disabled={!!massProgress} onPress={openTagEdit} />
-          <IconButton icon="share-variant-outline" disabled={!!massProgress} onPress={massShare} />
-          <IconButton icon="printer-outline" disabled={!!massProgress} onPress={massPrint} />
-          <IconButton icon="cloud-download-outline" disabled={!!massProgress} onPress={massDownload} />
-          <IconButton icon="trash-can-outline" disabled={!!massProgress} onPress={massTrash} />
+        <Surface elevation={2} style={{ paddingHorizontal: spacing.sm }}>
+          <View style={{ flexDirection: "row", alignItems: "center" }}>
+            <IconButton icon="close" onPress={() => setSelected(null)} />
+            <Text variant="titleSmall" style={{ flex: 1 }} numberOfLines={1}>
+              {massProgress || `${selected.size} selected`}
+            </Text>
+            <IconButton icon="select-all" disabled={!!massProgress} onPress={selectAll} />
+          </View>
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "flex-end" }}>
+            <IconButton icon="tag-multiple-outline" disabled={!!massProgress} onPress={openTagEdit} />
+            <IconButton icon="share-variant-outline" disabled={!!massProgress} onPress={massShare} />
+            <IconButton icon="printer-outline" disabled={!!massProgress} onPress={massPrint} />
+            <IconButton icon="cloud-download-outline" disabled={!!massProgress} onPress={massDownload} />
+            <IconButton icon="trash-can-outline" disabled={!!massProgress} onPress={massTrash} />
+          </View>
         </Surface>
       ) : null}
       <View style={{ padding: spacing.md, paddingBottom: 0 }}>
@@ -593,7 +628,7 @@ export default function DocumentsScreen() {
               doc={item}
               selected={selected?.has(item.id) ?? false}
               onPress={() => (selected ? toggleSelect(item.id) : router.push(`/document/${item.id}`))}
-              onLongPress={() => toggleSelect(item.id)}
+              onLongPress={() => rangeSelect(item.id)}
             />
           </SwipeableRow>
         )}

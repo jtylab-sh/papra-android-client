@@ -7,7 +7,7 @@
 import * as FS from "expo-file-system/legacy";
 import { AppState, ToastAndroid } from "react-native";
 import { ApiError, uploadDocument } from "~/lib/papra";
-import { stopUploadNotification, updateUploadProgress } from "~/lib/notifications";
+import { notifyUploadsComplete, stopUploadNotification, updateUploadProgress } from "~/lib/notifications";
 import { syncMetadata } from "~/lib/sync";
 
 const DIR = `${FS.documentDirectory}upload-queue/`;
@@ -123,6 +123,9 @@ async function doFlush(): Promise<FlushResult> {
     await FS.deleteAsync(`${DIR}${n}.json`, { idempotent: true });
   }
   if (entries.length > 0) await stopUploadNotification();
+  // The ongoing progress notification is gone in a second for small files;
+  // when the app is not on screen, leave a visible "uploaded" note behind.
+  if (sent > 0 && AppState.currentState !== "active") notifyUploadsComplete(sent).catch(() => {});
   if (sent > 0) {
     ToastAndroid.show(`Uploaded ${sent} queued document${sent === 1 ? "" : "s"}`, ToastAndroid.SHORT);
     syncMetadata().catch(() => {});

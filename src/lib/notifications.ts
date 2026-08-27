@@ -215,6 +215,12 @@ export async function updateUploadProgress(done: number, total: number, name: st
   }
 }
 
+/** Lingering note for uploads that finish while the app is out of sight. */
+export async function notifyUploadsComplete(count: number): Promise<void> {
+  const title = count === 1 ? "1 document uploaded" : `${count} documents uploaded`;
+  await post("sync", title, "", "/documents");
+}
+
 export async function stopUploadNotification(): Promise<void> {
   // ponytail: stopForegroundService stops the one shared service; a manual
   // sync running at the same moment degrades to a plain notification.
