@@ -89,25 +89,13 @@ export default function SettingsScreen() {
   }, []);
 
   const switchOrg = useCallback(
-    (org: PapraOrganization) => {
+    async (org: PapraOrganization) => {
       if (org.id === settings?.organizationId) return;
-      Alert.alert(
-        "Switch organization?",
-        `The offline mirror on this phone is cleared and re-synced for "${org.name}".`,
-        [
-          { text: "Cancel", style: "cancel" },
-          {
-            text: "Switch",
-            onPress: async () => {
-              setOrgDialog(false);
-              wipeLocalData();
-              const next = await saveSettings({ organizationId: org.id, organizationName: org.name });
-              setSettings(next);
-              syncMetadata().catch(() => {});
-            },
-          },
-        ],
-      );
+      // Each org has its own local mirror (papra-<orgId>.db) — nothing is wiped.
+      setOrgDialog(false);
+      const next = await saveSettings({ organizationId: org.id, organizationName: org.name });
+      setSettings(next);
+      syncMetadata().catch(() => {});
     },
     [settings?.organizationId],
   );

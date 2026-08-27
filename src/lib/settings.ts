@@ -3,6 +3,7 @@
  * API key must be there anyway — one store keeps it simple).
  */
 import * as SecureStore from "expo-secure-store";
+import { setActiveOrg } from "./db";
 
 export type AuthMode = "session" | "apiKey";
 
@@ -56,18 +57,21 @@ const KEY = "papra.settings";
 
 export async function getSettings(): Promise<Settings> {
   const raw = await SecureStore.getItemAsync(KEY);
-  if (!raw) return { ...DEFAULTS };
+  let settings: Settings;
   try {
-    return { ...DEFAULTS, ...JSON.parse(raw) };
+    settings = raw ? { ...DEFAULTS, ...JSON.parse(raw) } : { ...DEFAULTS };
   } catch {
-    return { ...DEFAULTS };
+    settings = { ...DEFAULTS };
   }
+  setActiveOrg(settings.organizationId);
+  return settings;
 }
 
 export async function saveSettings(patch: Partial<Settings>): Promise<Settings> {
   const next = { ...(await getSettings()), ...patch };
   if (next.serverUrl) next.serverUrl = normalizeServerUrl(next.serverUrl);
   await SecureStore.setItemAsync(KEY, JSON.stringify(next));
+  setActiveOrg(next.organizationId);
   return next;
 }
 

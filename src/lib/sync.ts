@@ -13,6 +13,7 @@ import {
   getCachedDocument,
   getMeta,
   listCachedDocuments,
+  setActiveOrg,
   pruneDocuments,
   setDocumentFileUri,
   setMeta,
@@ -255,9 +256,26 @@ export async function applySyncRegistration(): Promise<void> {
   }
 }
 
-/** Server switch / sign-out: drop the mirror and every blob. */
+/** Sign-out: drop every organization's mirror (all papra*.db files) and every blob. */
 export function wipeLocalData(): void {
   for (const uri of clearCache()) safeDelete(uri);
+  setActiveOrg(""); // close the open database before deleting files
+  try {
+    const sqliteDir = new Directory(Paths.document, "SQLite");
+    if (sqliteDir.exists) {
+      for (const entry of sqliteDir.list()) {
+        if (entry instanceof File && entry.name.startsWith("papra")) {
+          try {
+            entry.delete();
+          } catch {
+            /* locked journal — ignored */
+          }
+        }
+      }
+    }
+  } catch {
+    /* fine */
+  }
   try {
     docsDir().delete();
   } catch {

@@ -20,10 +20,31 @@ export interface CachedDocument {
 }
 
 let db: SQLite.SQLiteDatabase | null = null;
+let activeOrgId = "";
+
+/**
+ * Every organization gets its own database file (papra-<orgId>.db), so
+ * switching orgs never wipes anything — each mirror lives side by side.
+ * Called from settings load/save; must run before any query for the org.
+ */
+export function setActiveOrg(orgId: string): void {
+  if (orgId === activeOrgId) return;
+  try {
+    db?.closeSync();
+  } catch {
+    /* already closed */
+  }
+  db = null;
+  activeOrgId = orgId;
+}
+
+export function activeDbName(): string {
+  return activeOrgId ? `papra-${activeOrgId}.db` : "papra.db";
+}
 
 export function getDb(): SQLite.SQLiteDatabase {
   if (!db) {
-    db = SQLite.openDatabaseSync("papra.db");
+    db = SQLite.openDatabaseSync(activeDbName());
     db.execSync(`
       pragma journal_mode = wal;
       create table if not exists documents (
