@@ -151,6 +151,26 @@ export async function emptyTrash(): Promise<void> {
   await papraRequest(orgPath(s, "/documents/trash"), { method: "DELETE", settings: s });
 }
 
+/** Batch move to trash; falls back to one-by-one on servers without the batch route. */
+export async function batchTrashDocuments(documentIds: string[]): Promise<void> {
+  const s = await getSettings();
+  try {
+    await papraRequest(orgPath(s, "/documents/batch/trash"), {
+      method: "POST",
+      body: { filter: { documentIds } },
+      settings: s,
+    });
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 404) {
+      for (const id of documentIds) {
+        await papraRequest(orgPath(s, `/documents/${id}`), { method: "DELETE", settings: s });
+      }
+      return;
+    }
+    throw e;
+  }
+}
+
 export async function listTags(): Promise<PapraTag[]> {
   const s = await getSettings();
   const json = await papraRequest<{ tags: PapraTag[] }>(orgPath(s, "/tags"), { settings: s });

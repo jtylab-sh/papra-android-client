@@ -1,14 +1,15 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { FlatList, RefreshControl, View } from "react-native";
-import { Card, IconButton, Text, useTheme } from "react-native-paper";
+import { Alert, FlatList, RefreshControl, View } from "react-native";
+import { Card, IconButton, Surface, Text, useTheme } from "react-native-paper";
 import { Input, Muted, Row, TagChip, formatBytes, formatDate } from "../../components/ui";
 import { spacing, type AppTheme } from "../../constants/theme";
 import { countCachedDocuments, getCachedDocument, listCachedDocuments, type CachedDocument } from "../../lib/db";
-import { listDocuments } from "../../lib/papra";
+import { batchTrashDocuments, listDocuments } from "../../lib/papra";
 import { getSettings, isConnected } from "../../lib/settings";
 import { syncMetadata, upsertFromSearch } from "../../lib/screens-helpers";
+import { ensureLocalFile } from "../../lib/sync";
 
 export default function DocumentsScreen() {
   const theme = useTheme<AppTheme>();
@@ -113,10 +114,78 @@ export default function DocumentsScreen() {
     });
   }, [serverMode, docs.length, search, total, runServerSearch]);
 
+  // --- multi-select (long press) ---
+  const [selected, setSelected] = useState<Set<string> | null>(null);
+  const [massProgress, setMassProgress] = useState("");
+
+  const toggleSelect = useCallback((docId: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev ?? []);
+      if (next.has(docId)) next.delete(docId);
+      else next.add(docId);
+      return next.size === 0 ? null : next;
+    });
+  }, []);
+
+  const massDownload = useCallback(async () => {
+    const ids = [...(selected ?? [])];
+    let failed = 0;
+    for (let i = 0; i < ids.length; i++) {
+      setMassProgress(`Downloading ${i + 1}/${ids.length}`);
+      try {
+        await ensureLocalFile(ids[i]);
+      } catch {
+        failed++;
+      }
+    }
+    setMassProgress("");
+    setSelected(null);
+    loadLocal(search);
+    if (failed) Alert.alert("Partial", `${failed} of ${ids.length} downloads failed.`);
+  }, [selected, search, loadLocal]);
+
+  const massTrash = useCallback(() => {
+    const ids = [...(selected ?? [])];
+    Alert.alert(
+      `Move ${ids.length} document${ids.length === 1 ? "" : "s"} to trash?`,
+      "They stay in the trash for 30 days, then they are deleted permanently.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Trash",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              setMassProgress("Trashing…");
+              await batchTrashDocuments(ids);
+              setSelected(null);
+              await syncMetadata();
+              loadLocal(search);
+            } catch (e) {
+              Alert.alert("Failed", e instanceof Error ? e.message : String(e));
+            } finally {
+              setMassProgress("");
+            }
+          },
+        },
+      ],
+    );
+  }, [selected, search, loadLocal]);
+
   if (!ready) return <View style={{ flex: 1, backgroundColor: theme.colors.background }} />;
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+      {selected ? (
+        <Surface elevation={2} style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: spacing.sm }}>
+          <IconButton icon="close" onPress={() => setSelected(null)} />
+          <Text variant="titleSmall" style={{ flex: 1 }}>
+            {massProgress || `${selected.size} selected`}
+          </Text>
+          <IconButton icon="cloud-download-outline" disabled={!!massProgress} onPress={massDownload} />
+          <IconButton icon="trash-can-outline" disabled={!!massProgress} onPress={massTrash} />
+        </Surface>
+      ) : null}
       <View style={{ padding: spacing.md, paddingBottom: 0 }}>
         <Input
           placeholder={'Search — tag:invoice, NOT draft, "phrase"'}
@@ -143,16 +212,41 @@ export default function DocumentsScreen() {
             </Muted>
           ) : null
         }
-        renderItem={({ item }) => <DocumentRow doc={item} />}
+        renderItem={({ item }) => (
+          <DocumentRow
+            doc={item}
+            selecting={selected !== null}
+            isSelected={selected?.has(item.id) ?? false}
+            onToggle={() => toggleSelect(item.id)}
+          />
+        )}
       />
     </View>
   );
 }
 
-function DocumentRow({ doc }: { doc: CachedDocument }) {
+function DocumentRow({
+  doc,
+  selecting,
+  isSelected,
+  onToggle,
+}: {
+  doc: CachedDocument;
+  selecting: boolean;
+  isSelected: boolean;
+  onToggle: () => void;
+}) {
   const theme = useTheme<AppTheme>();
   return (
-    <Card mode="contained" style={{ marginBottom: spacing.sm }} onPress={() => router.push(`/document/${doc.id}`)}>
+    <Card
+      mode="contained"
+      style={[
+        { marginBottom: spacing.sm },
+        isSelected && { backgroundColor: theme.colors.secondaryContainer },
+      ]}
+      onPress={() => (selecting ? onToggle() : router.push(`/document/${doc.id}`))}
+      onLongPress={onToggle}
+    >
       <Card.Content>
         <Text variant="titleSmall" numberOfLines={1}>
           {doc.name}
