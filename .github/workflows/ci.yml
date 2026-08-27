@@ -157,8 +157,14 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          excerpt=$(grep -B 2 -A 60 "What went wrong" /tmp/gradle.log | head -160)
-          [ -n "$excerpt" ] || excerpt=$(tail -160 /tmp/gradle.log)
+          # node/tool stderr appears BEFORE gradle's FAILURE block — include it.
+          ln=$(grep -n "FAILURE: Build failed" /tmp/gradle.log | head -1 | cut -d: -f1)
+          if [ -n "$ln" ]; then
+            start=$(( ln > 150 ? ln - 150 : 1 ))
+            excerpt=$(sed -n "${start},$((ln + 15))p" /tmp/gradle.log)
+          else
+            excerpt=$(tail -160 /tmp/gradle.log)
+          fi
           {
             echo '## Gradle failure'
             echo '```'
