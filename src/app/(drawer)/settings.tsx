@@ -148,7 +148,9 @@ export default function SettingsScreen() {
       setProgress(
         result.skipped
           ? `Skipped (${result.skipped})`
-          : `Done: ${result.documents} documents, ${result.downloaded} downloaded${result.failed ? `, ${result.failed} failed` : ""}`,
+          : `Done: ${result.documents} documents, ${result.downloaded} downloaded${
+              result.failed ? `, ${result.failed} failed (${result.lastError})` : ""
+            }`,
       );
     } catch (e) {
       setProgress(`Failed: ${e instanceof Error ? e.message : String(e)}`);

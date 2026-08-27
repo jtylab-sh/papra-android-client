@@ -149,11 +149,23 @@ export async function localFileNamedForUser(id: string): Promise<string> {
   return target.uri;
 }
 
+/** One retry after a short pause — enough for transient network/proxy hiccups. */
+async function downloadWithRetry(id: string): Promise<void> {
+  try {
+    await ensureLocalFile(id);
+  } catch {
+    await new Promise((r) => setTimeout(r, 1000));
+    await ensureLocalFile(id);
+  }
+}
+
 export interface SyncResult {
   skipped?: "not-configured" | "wifi";
   documents: number;
   downloaded: number;
   failed: number;
+  /** message of the last failed download — the only clue when many fail */
+  lastError?: string;
 }
 
 export async function syncNow(
@@ -185,23 +197,25 @@ export async function syncNow(
   let downloaded = 0;
   let failed = 0;
   let done = 0;
+  let lastError = "";
   for (const id of ids) {
     const cached = getCachedDocument(id);
     const needsFile = !cached?.fileUri || !new File(cached.fileUri).exists;
     if (needsFile) {
       try {
-        await ensureLocalFile(id);
+        await downloadWithRetry(id);
         downloaded++;
-      } catch {
+      } catch (e) {
         failed++;
+        lastError = e instanceof Error ? e.message : String(e);
       }
     }
     await exportCopy(id, s.offlineExportDirUri);
     opts.onProgress?.(++done, ids.length);
   }
   setMeta("lastSyncAt", new Date().toISOString());
-  setMeta("lastSyncResult", JSON.stringify({ documents: ids.length, downloaded, failed }));
-  return { documents: ids.length, downloaded, failed };
+  setMeta("lastSyncResult", JSON.stringify({ documents: ids.length, downloaded, failed, lastError }));
+  return { documents: ids.length, downloaded, failed, lastError: lastError || undefined };
 }
 
 /**
