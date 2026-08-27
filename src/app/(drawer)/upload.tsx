@@ -4,6 +4,7 @@ import { Alert, FlatList, View } from "react-native";
 import { ActivityIndicator, Button as PaperButton, Dialog, IconButton, Portal, Text, useTheme } from "react-native-paper";
 import { Button, Card, Input, Muted, Row } from "~/components/ui";
 import { spacing, type AppTheme } from "~/constants/theme";
+import { requestNotificationPermission } from "~/lib/notifications";
 import { enqueueUpload, flushUploads, removeQueuedUpload } from "~/lib/uploads";
 import { pickFiles, scanDocuments } from "~/lib/pickers";
 
@@ -126,6 +127,10 @@ export default function UploadScreen() {
 
   const upload = useCallback(async () => {
     setBusy(true);
+    // Android 13+ hides every notification until this is granted, and the
+    // Settings toggles are opt-in - so the progress notification asks here,
+    // on the first upload. Denying it never blocks the upload itself.
+    await requestNotificationPermission().catch(() => {});
     // Every file goes through the on-disk queue first: the upload survives
     // app switches and kills (foreground flushes and the background task
     // drain the queue), and one notification shows batch progress.

@@ -5,6 +5,7 @@ import { Alert, FlatList, View } from "react-native";
 import { IconButton, Text, useTheme } from "react-native-paper";
 import { Button, Card, Muted, Row, formatBytes, formatDate } from "~/components/ui";
 import { spacing, type AppTheme } from "~/constants/theme";
+import { requestNotificationPermission } from "~/lib/notifications";
 import {
   clearQueuedUploads,
   flushUploads,
@@ -30,6 +31,8 @@ export default function QueueScreen() {
 
   const uploadNow = useCallback(async () => {
     setBusy(true);
+    // Same as the upload page: the progress notification needs this on 13+.
+    await requestNotificationPermission().catch(() => {});
     try {
       const result = await flushUploads();
       if (result?.failedError) {
