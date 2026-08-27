@@ -13,8 +13,7 @@ import { applySyncRegistration } from "../lib/sync";
 function draftSettings(serverUrl: string): Settings {
   return {
     serverUrl,
-    authMode: "session",
-    apiKey: "",
+    accountEmail: "",
     organizationId: "",
     organizationName: "",
     syncEnabled: false,
@@ -86,7 +85,7 @@ export default function SignInScreen() {
         setStep("totp");
         return;
       }
-      await pickOrgsOrFinish(draftSettings(url));
+      await pickOrgsOrFinish({ ...draftSettings(url), accountEmail: email.trim() });
     });
 
   const verifyTotp = () =>
@@ -96,7 +95,7 @@ export default function SignInScreen() {
       // trustDevice: skip the TOTP prompt on this phone for future sign-ins.
       const { error: totpError } = await client.twoFactor.verifyTotp({ code: code.trim(), trustDevice: true });
       if (totpError) throw new Error(totpError.message ?? "Invalid code");
-      await pickOrgsOrFinish(draftSettings(url));
+      await pickOrgsOrFinish({ ...draftSettings(url), accountEmail: email.trim() });
     });
 
   if (step === "org") {
@@ -172,17 +171,3 @@ export default function SignInScreen() {
     </KeyboardAvoidingView>
   );
 }
-
-/*
- * API-key sign-in — parked, not deleted. The lib layer (settings.authMode
- * "apiKey", papra.ts Bearer branch) still supports it; only this UI entry is
- * disabled. Re-enable if a server can't trust the papra:// scheme (old Papra,
- * overridden TRUSTED_APP_SCHEMES) by restoring:
- *
- *   - a mode toggle ("Email & password" | "API key")
- *   - an Input bound to `apiKey` (secureTextEntry)
- *   - connect() branch:
- *       if (!apiKey.trim()) throw new Error("Paste an API key.");
- *       await pickOrgsOrFinish({ ...draftSettings(url), authMode: "apiKey", apiKey: apiKey.trim() });
- *   - hint: Papra → user menu → API keys; needs documents:read/create/update/delete + tags:read.
- */

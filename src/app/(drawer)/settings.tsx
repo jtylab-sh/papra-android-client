@@ -47,7 +47,19 @@ export default function SettingsScreen() {
   const lastSyncAt = getMeta("lastSyncAt");
 
   useEffect(() => {
-    getSettings().then(setSettings);
+    getSettings().then((s) => {
+      setSettings(s);
+      // Installs from before accountEmail existed: read it from the session once.
+      if (!s.accountEmail && s.serverUrl) {
+        getAuthClient(s.serverUrl)
+          .getSession()
+          .then(({ data }) => {
+            const email = data?.user?.email;
+            if (email) saveSettings({ accountEmail: email }).then(setSettings);
+          })
+          .catch(() => {});
+      }
+    });
   }, []);
 
   const update = useCallback(async (patch: Partial<Settings>, reRegister = false) => {
@@ -153,7 +165,7 @@ export default function SettingsScreen() {
         style: "destructive",
         onPress: async () => {
           const s = await getSettings();
-          if (s.authMode === "session" && s.serverUrl) {
+          if (s.serverUrl) {
             await getAuthClient(s.serverUrl)
               .signOut()
               .catch(() => {});
@@ -180,7 +192,7 @@ export default function SettingsScreen() {
         <View style={{ marginTop: 8 }}>
           <KeyValue label="URL" value={settings.serverUrl} />
           <KeyValue label="Organization" value={settings.organizationName || settings.organizationId} />
-          <KeyValue label="Auth" value={settings.authMode === "apiKey" ? "API key" : "Email & password"} />
+          <KeyValue label="Signed in as" value={settings.accountEmail || "\u2014"} />
         </View>
         <View style={{ marginTop: spacing.sm }}>
           <Button label="Manage organizations" kind="ghost" onPress={openOrgDialog} />

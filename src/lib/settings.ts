@@ -1,16 +1,13 @@
 /**
- * App settings, stored in SecureStore (everything is small strings, and the
- * API key must be there anyway — one store keeps it simple).
+ * App settings, stored in SecureStore (everything is small strings).
  */
 import * as SecureStore from "expo-secure-store";
 import { setActiveOrg } from "./db";
 
-export type AuthMode = "session" | "apiKey";
-
 export interface Settings {
   serverUrl: string; // normalized, no trailing slash
-  authMode: AuthMode;
-  apiKey: string;
+  /** email of the signed-in better-auth account (display only) */
+  accountEmail: string;
   organizationId: string;
   organizationName: string;
   syncEnabled: boolean;
@@ -36,8 +33,7 @@ export interface Settings {
 
 const DEFAULTS: Settings = {
   serverUrl: "",
-  authMode: "session",
-  apiKey: "",
+  accountEmail: "",
   organizationId: "",
   organizationName: "",
   syncEnabled: false,
@@ -87,5 +83,5 @@ export function normalizeServerUrl(url: string): string {
 
 /** Configured enough to talk to a server (org may still be unpicked). */
 export function isConnected(s: Settings): boolean {
-  return Boolean(s.serverUrl && (s.authMode === "apiKey" ? s.apiKey : true) && s.organizationId);
+  return Boolean(s.serverUrl && s.organizationId);
 }

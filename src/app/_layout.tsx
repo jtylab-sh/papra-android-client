@@ -62,7 +62,7 @@ export default function RootLayout() {
         style: "destructive",
         onPress: async () => {
           const s = await getSettings();
-          if (s.authMode === "session" && s.serverUrl) {
+          if (s.serverUrl) {
             await getAuthClient(s.serverUrl)
               .signOut()
               .catch(() => {});

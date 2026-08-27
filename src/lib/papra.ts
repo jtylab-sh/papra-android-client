@@ -1,8 +1,7 @@
 /**
  * Minimal typed client for Papra's REST API.
  *
- * Auth is either the better-auth session cookie (session mode) or an API key
- * as `Authorization: Bearer` (apiKey mode) — same routes either way.
+ * Auth is the better-auth session cookie.
  */
 import { getAuthCookie } from "./auth";
 import { getSettings, type Settings } from "./settings";
@@ -62,7 +61,6 @@ export class ApiError extends Error {
 }
 
 async function authHeaders(s: Settings): Promise<Record<string, string>> {
-  if (s.authMode === "apiKey") return { Authorization: `Bearer ${s.apiKey}` };
   const cookie = await getAuthCookie(s.serverUrl);
   return cookie ? { Cookie: cookie } : {};
 }
