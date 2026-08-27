@@ -39,7 +39,7 @@ import {
   type PapraDocumentView,
   type PapraTag,
 } from "~/lib/papra";
-import { pickFiles, scanDocuments } from "~/lib/pickers";
+import { scanDocuments } from "~/lib/pickers";
 import { useOnReconnect } from "~/lib/network";
 import { isPrintCancel, printDocument } from "~/lib/print";
 import { getSettings, isConnected } from "~/lib/settings";
@@ -214,9 +214,9 @@ export default function DocumentsScreen() {
     if (files.length) router.push({ pathname: "/upload", params: { files: JSON.stringify(files) } });
   }, []);
 
-  const startUpload = useCallback(async () => {
-    const files = await pickFiles();
-    if (files.length) router.push({ pathname: "/upload", params: { files: JSON.stringify(files) } });
+  const startUpload = useCallback(() => {
+    // Land on the upload page first; it opens the picker itself.
+    router.push({ pathname: "/upload", params: { mode: "pick" } });
   }, []);
 
   // --- swipe actions on rows ---

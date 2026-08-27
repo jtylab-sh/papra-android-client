@@ -4,7 +4,7 @@
  */
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
-import { FlatList, RefreshControl, View } from "react-native";
+import { FlatList, Pressable, RefreshControl, View } from "react-native";
 import { Text, useTheme } from "react-native-paper";
 import { DocumentRow } from "~/components/document-row";
 import { Button, Card, Muted, Row, formatBytes } from "~/components/ui";
@@ -12,7 +12,7 @@ import { spacing, type AppTheme } from "~/constants/theme";
 import { countCachedDocuments, listCachedDocuments, type CachedDocument } from "~/lib/db";
 import { useOnReconnect } from "~/lib/network";
 import { getDocumentsStatistics, type PapraOrgStats } from "~/lib/papra";
-import { pickFiles, scanDocuments } from "~/lib/pickers";
+import { scanDocuments } from "~/lib/pickers";
 import { getSettings, isConnected } from "~/lib/settings";
 import { countOfflineOnDisk, syncMetadata } from "~/lib/sync";
 import { countQueuedUploads } from "~/lib/uploads";
@@ -72,9 +72,9 @@ export default function HomeScreen() {
     if (files.length) router.push({ pathname: "/upload", params: { files: JSON.stringify(files) } });
   }, []);
 
-  const startUpload = useCallback(async () => {
-    const files = await pickFiles();
-    if (files.length) router.push({ pathname: "/upload", params: { files: JSON.stringify(files) } });
+  const startUpload = useCallback(() => {
+    // Land on the upload page first; it opens the picker itself.
+    router.push({ pathname: "/upload", params: { mode: "pick" } });
   }, []);
 
   if (!ready) return <View style={{ flex: 1, backgroundColor: theme.colors.background }} />;
@@ -103,7 +103,11 @@ export default function HomeScreen() {
               <Stat label="Size" value={stats ? formatBytes(stats.documentsSize) : "-"} />
               <Stat label="In trash" value={stats ? String(stats.deletedDocumentsCount) : "-"} />
               <Stat label="Offline" value={String(countOfflineOnDisk())} />
-              {queued > 0 ? <Stat label="Queued" value={String(queued)} /> : null}
+              {queued > 0 ? (
+                <Pressable onPress={() => router.push("/queue")}>
+                  <Stat label="Queued" value={String(queued)} />
+                </Pressable>
+              ) : null}
             </Row>
           </Card>
           <Text variant="titleMedium">Recent documents</Text>

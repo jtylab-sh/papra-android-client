@@ -1,8 +1,8 @@
 import { Stack, router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { FlatList, View } from "react-native";
-import { Text, useTheme } from "react-native-paper";
-import { Button, Card, Muted, Row } from "~/components/ui";
+import { Button as PaperButton, Dialog, IconButton, Portal, Text, useTheme } from "react-native-paper";
+import { Button, Card, Input, Muted, Row } from "~/components/ui";
 import { spacing, type AppTheme } from "~/constants/theme";
 import { ApiError, uploadDocument } from "~/lib/papra";
 import { enqueueUpload } from "~/lib/uploads";
@@ -22,6 +22,23 @@ export default function UploadScreen() {
   const params = useLocalSearchParams<{ files?: string; mode?: string }>();
   const [files, setFiles] = useState<PendingFile[]>([]);
   const [busy, setBusy] = useState(false);
+  const [rename, setRename] = useState<{ index: number; text: string } | null>(null);
+
+  const saveRename = useCallback(() => {
+    if (!rename) return;
+    setFiles((prev) =>
+      prev.map((f, j) => {
+        if (j !== rename.index) return f;
+        let name = rename.text.trim();
+        if (!name) return f;
+        // Keep the original extension when the new name has none.
+        const dot = f.name.lastIndexOf(".");
+        if (!name.includes(".") && dot > 0) name += f.name.slice(dot);
+        return { ...f, name };
+      }),
+    );
+    setRename(null);
+  }, [rename]);
 
   const pick = useCallback(async (): Promise<boolean> => {
     const picked = await pickFiles();
@@ -117,11 +134,21 @@ export default function UploadScreen() {
         data={files}
         keyExtractor={(f, i) => `${f.uri}-${i}`}
         ListEmptyComponent={<Muted>Nothing selected yet.</Muted>}
-        renderItem={({ item }) => (
+        renderItem={({ item, index }) => (
           <Card style={{ marginBottom: spacing.sm }}>
-            <Text variant="bodyLarge" numberOfLines={1}>
-              {item.name}
-            </Text>
+            <Row>
+              <Text variant="bodyLarge" numberOfLines={1} style={{ flex: 1 }}>
+                {item.name}
+              </Text>
+              {item.status === "pending" ? (
+                <IconButton
+                  icon="pencil-outline"
+                  size={16}
+                  accessibilityLabel={`Rename ${item.name}`}
+                  onPress={() => setRename({ index, text: item.name })}
+                />
+              ) : null}
+            </Row>
             <Text variant="bodySmall" style={{ color: statusColor[item.status], marginTop: 2 }}>
               {item.status === "queued" ? "queued - uploads when back online" : item.status}
               {item.error ? ` - ${item.error}` : ""}
@@ -129,6 +156,20 @@ export default function UploadScreen() {
           </Card>
         )}
       />
+      <Portal>
+        <Dialog visible={rename !== null} onDismiss={() => setRename(null)}>
+          <Dialog.Title>Document name</Dialog.Title>
+          <Dialog.Content>
+            <Input label="Name" value={rename?.text ?? ""} onChangeText={(t) => setRename((r) => (r ? { ...r, text: t } : r))} autoFocus />
+          </Dialog.Content>
+          <Dialog.Actions>
+            <PaperButton onPress={() => setRename(null)}>Cancel</PaperButton>
+            <PaperButton mode="contained" disabled={!rename?.text.trim()} onPress={saveRename}>
+              Save
+            </PaperButton>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
       {allDone ? (
         <Button label="Done" onPress={() => router.back()} />
       ) : (

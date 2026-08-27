@@ -86,12 +86,15 @@ export default function RootLayout() {
     const sub = AppState.addEventListener("change", (state) => {
       if (state === "background") {
         leftAt.current = Date.now();
-      } else if (state === "active" && leftAt.current !== null) {
-        const awayMs = Date.now() - leftAt.current;
-        leftAt.current = null;
-        getSettings().then((s) => {
-          if (s.biometricLock && awayMs > s.lockGraceMinutes * 60_000) setLocked(true);
-        });
+      } else if (state === "active") {
+        flushUploads().catch(() => {});
+        if (leftAt.current !== null) {
+          const awayMs = Date.now() - leftAt.current;
+          leftAt.current = null;
+          getSettings().then((s) => {
+            if (s.biometricLock && awayMs > s.lockGraceMinutes * 60_000) setLocked(true);
+          });
+        }
       }
     });
     return () => {

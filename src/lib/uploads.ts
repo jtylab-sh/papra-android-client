@@ -16,6 +16,41 @@ interface QueuedMeta {
   mimeType?: string;
 }
 
+export interface QueuedUpload {
+  key: string;
+  name: string;
+  mimeType?: string;
+  queuedAt: number;
+  size: number | null;
+}
+
+export async function listQueuedUploads(): Promise<QueuedUpload[]> {
+  const names = await FS.readDirectoryAsync(DIR).catch(() => [] as string[]);
+  const out: QueuedUpload[] = [];
+  for (const n of names.filter((x) => !x.endsWith(".json"))) {
+    const metaRaw = await FS.readAsStringAsync(`${DIR}${n}.json`).catch(() => null);
+    const meta: QueuedMeta = metaRaw ? JSON.parse(metaRaw) : { name: n };
+    const info = await FS.getInfoAsync(`${DIR}${n}`).catch(() => null);
+    out.push({
+      key: n,
+      name: meta.name,
+      mimeType: meta.mimeType,
+      queuedAt: Number(n.split("-")[0]) || 0,
+      size: info?.exists ? (info.size ?? null) : null,
+    });
+  }
+  return out.sort((a, b) => a.queuedAt - b.queuedAt);
+}
+
+export async function removeQueuedUpload(key: string): Promise<void> {
+  await FS.deleteAsync(`${DIR}${key}`, { idempotent: true });
+  await FS.deleteAsync(`${DIR}${key}.json`, { idempotent: true });
+}
+
+export async function clearQueuedUploads(): Promise<void> {
+  await FS.deleteAsync(DIR, { idempotent: true }); // enqueue recreates it
+}
+
 export async function countQueuedUploads(): Promise<number> {
   const names = await FS.readDirectoryAsync(DIR).catch(() => [] as string[]);
   return names.filter((n) => !n.endsWith(".json")).length;
@@ -30,7 +65,18 @@ export async function enqueueUpload(file: { uri: string; name: string; mimeType?
 }
 
 /** Send everything in the queue. Safe to call any time; no-op when empty. */
+let flushing = false; // foreground + reconnect + manual can overlap
 export async function flushUploads(): Promise<void> {
+  if (flushing) return;
+  flushing = true;
+  try {
+    await doFlush();
+  } finally {
+    flushing = false;
+  }
+}
+
+async function doFlush(): Promise<void> {
   const names = await FS.readDirectoryAsync(DIR).catch(() => [] as string[]);
   const entries = names.filter((n) => !n.endsWith(".json"));
   let sent = 0;
