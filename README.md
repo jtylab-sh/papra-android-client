@@ -5,6 +5,9 @@ archiving platform. Built for personal use: connect it to **your own Papra serve
 documents, and keep a full offline mirror on the phone. Dark mode only. Not affiliated with the Papra
 project.
 
+> 🤖 This app is **AI-generated**: designed, written and released by [Claude](https://claude.com/claude-code)
+> (Anthropic) under human direction, including this README.
+
 ## Features
 
 - **Connect to any self-hosted Papra instance** — enter the server URL on first run.
@@ -20,6 +23,9 @@ project.
 - **Search like Papra**, results streaming in as you type: the server's real query grammar —
   `AND`/`OR`/`NOT`, `-negation`, `"quoted phrases"`, `tag:`, `name:`, `content:`, `created:`,
   `date:`, `has:` filters. Offline it falls back to local name search.
+- **Views (saved searches)**, like the Papra sidebar: save the current search as a named view from
+  the bookmark icon, run one from the chip strip under the search box, long-press to delete. Views
+  are stored server-side and shared with the web UI.
 - **Tags**: create, edit and delete org tags (colors + descriptions), and add/remove tags on any
   document.
 - **Multi-select** (long press): batch move-to-trash and batch download-offline.
