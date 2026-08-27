@@ -124,10 +124,29 @@ function whereClause(search: string, synced?: boolean): { where: string; args: s
   return { where: conds.length ? ` where ${conds.join(" and ")}` : "", args };
 }
 
-export function listCachedDocuments(search = "", limit = -1, offset = 0, synced?: boolean): CachedDocument[] {
+export interface CacheSort {
+  field: "createdAt" | "updatedAt" | "name";
+  order: "asc" | "desc";
+}
+
+// Whitelisted order-by fragments — sort input never reaches SQL directly.
+const ORDER_SQL: Record<CacheSort["field"], string> = {
+  createdAt: "createdAt",
+  updatedAt: "updatedAt",
+  name: "name collate nocase",
+};
+
+export function listCachedDocuments(
+  search = "",
+  limit = -1,
+  offset = 0,
+  synced?: boolean,
+  sort?: CacheSort,
+): CachedDocument[] {
   // limit -1 = no limit (SQLite convention); offset only applies with a limit.
   const { where, args } = whereClause(search, synced);
-  const rows = getDb().getAllSync(`select * from documents${where} order by createdAt desc limit ? offset ?`, [
+  const orderBy = sort ? `${ORDER_SQL[sort.field]} ${sort.order === "asc" ? "asc" : "desc"}` : "createdAt desc";
+  const rows = getDb().getAllSync(`select * from documents${where} order by ${orderBy} limit ? offset ?`, [
     ...args,
     limit,
     offset,

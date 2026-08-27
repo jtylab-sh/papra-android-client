@@ -29,10 +29,14 @@ project.
 - **Tags**: create, edit and delete org tags (colors + descriptions), and add/remove tags on any
   document.
 - **Custom properties**: create, rename and delete the org's property definitions (text, number,
-  date, yes/no, select, multi-select with options) from their own page; document values show on the
-  document page.
-- **Multi-select** (long press): select all, batch share, batch print, batch move-to-trash and
-  batch download-offline; the back button leaves selection mode.
+  date, yes/no, select, multi-select with options) from their own page; on the document page every
+  property is shown and text/number/date/yes-no values are editable in place (selects and
+  relations stay web-app territory). Images open in a pinch-zoom viewer.
+- **Multi-select** (long press): select all, batch tag/untag, batch share, batch print, batch
+  move-to-trash and batch download-offline; the back button leaves selection mode.
+- **Swipe actions**: swipe a document row right to download it offline, left to move it to trash.
+- **Sort and tag filters**: sort by date, name or last update (locally and in server search), and
+  one-tap tag chips filter the list through the server's `tag:` syntax.
 - **Upload** via in-app file picker, the Android share sheet (share any file to Papra), or the built-in
   **document scanner** (ML Kit edge detection).
 - **Open / download / share / print** document files under their display name (printing goes
@@ -91,6 +95,9 @@ The APK is built for **arm64 (64-bit)** devices — any Android phone from rough
   from Google. Scanning itself runs on-device; documents are not uploaded anywhere except to your
   server when you press upload.
 - Notifications are generated locally on the phone (no push service involved).
+- **In-app updates**: the update popup can download the APK and open the Android installer
+  directly (the first time, Android asks you to allow installs from Papra); if anything fails it
+  falls back to the release page in the browser.
 - One exception to server-only traffic: on start the app checks this repo's GitHub releases
   (`api.github.com`) for a newer version. Plain unauthenticated GET, nothing sent beyond the
   request itself.

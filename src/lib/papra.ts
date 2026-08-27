@@ -131,13 +131,33 @@ export interface DocumentPage {
   documentsCount: number;
 }
 
+export type DocumentSortField = "createdAt" | "updatedAt" | "name" | "documentDate";
+export type DocumentSortOrder = "asc" | "desc";
+
 export async function listDocuments(
-  { pageIndex = 0, pageSize = 100, searchQuery = "" } = {},
+  {
+    pageIndex = 0,
+    pageSize = 100,
+    searchQuery = "",
+    sortField,
+    sortOrder,
+  }: {
+    pageIndex?: number;
+    pageSize?: number;
+    searchQuery?: string;
+    sortField?: DocumentSortField;
+    sortOrder?: DocumentSortOrder;
+  } = {},
   settings?: Settings,
 ): Promise<DocumentPage> {
   const s = settings ?? (await getSettings());
   return papraRequest<DocumentPage>(orgPath(s, "/documents"), {
-    query: { pageIndex, pageSize, ...(searchQuery ? { searchQuery } : {}) },
+    query: {
+      pageIndex,
+      pageSize,
+      ...(searchQuery ? { searchQuery } : {}),
+      ...(sortField ? { sortField, sortOrder: sortOrder ?? "desc" } : {}),
+    },
     settings: s,
   });
 }
@@ -230,6 +250,41 @@ export async function batchTrashDocuments(documentIds: string[]): Promise<void> 
     }
     throw e;
   }
+}
+
+/** Batch add/remove tags on many documents at once (server route, one request). */
+export async function batchTagsDocuments(
+  documentIds: string[],
+  addTagIds: string[],
+  removeTagIds: string[],
+): Promise<void> {
+  const s = await getSettings();
+  await papraRequest(orgPath(s, "/documents/batch/tags"), {
+    method: "POST",
+    body: { filter: { documentIds }, addTagIds, removeTagIds },
+    settings: s,
+  });
+}
+
+export async function setDocumentPropertyValue(
+  documentId: string,
+  propertyDefinitionId: string,
+  value: unknown,
+): Promise<void> {
+  const s = await getSettings();
+  await papraRequest(orgPath(s, `/documents/${documentId}/custom-properties/${propertyDefinitionId}`), {
+    method: "PUT",
+    body: { value },
+    settings: s,
+  });
+}
+
+export async function clearDocumentPropertyValue(documentId: string, propertyDefinitionId: string): Promise<void> {
+  const s = await getSettings();
+  await papraRequest(orgPath(s, `/documents/${documentId}/custom-properties/${propertyDefinitionId}`), {
+    method: "DELETE",
+    settings: s,
+  });
 }
 
 export async function listTags(): Promise<PapraTag[]> {

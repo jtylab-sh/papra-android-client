@@ -1,11 +1,12 @@
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
-import { FlatList, View } from "react-native";
+import { FlatList, RefreshControl, View } from "react-native";
 import { Searchbar, useTheme } from "react-native-paper";
 import { DocumentRow } from "../../components/document-row";
-import { Muted } from "../../components/ui";
+import { Button, Muted } from "../../components/ui";
 import { spacing, type AppTheme } from "../../constants/theme";
 import { countCachedDocuments, listCachedDocuments, type CachedDocument } from "../../lib/db";
+import { syncMetadata } from "../../lib/sync";
 
 export default function OfflineScreen() {
   const theme = useTheme<AppTheme>();
@@ -42,6 +43,19 @@ export default function OfflineScreen() {
     });
   }, [search, total]);
 
+  const [refreshing, setRefreshing] = useState(false);
+  const refresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await syncMetadata();
+    } catch {
+      /* offline - the cached list stays */
+    } finally {
+      loadLocal(search);
+      setRefreshing(false);
+    }
+  }, [search, loadLocal]);
+
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
       <View style={{ padding: spacing.md, paddingBottom: 0 }}>
@@ -57,7 +71,13 @@ export default function OfflineScreen() {
         data={docs}
         keyExtractor={(d) => d.id}
         contentContainerStyle={{ padding: spacing.md }}
-        ListEmptyComponent={<Muted>Nothing offline yet. Enable offline sync in Settings or download documents individually.</Muted>}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={theme.colors.primary} />}
+        ListEmptyComponent={
+          <View style={{ gap: spacing.md }}>
+            <Muted>Nothing offline yet. Enable offline sync or download documents individually.</Muted>
+            <Button label="Open sync settings" kind="ghost" onPress={() => router.push("/settings")} />
+          </View>
+        }
         onEndReached={loadMore}
         onEndReachedThreshold={0.5}
         ListFooterComponent={

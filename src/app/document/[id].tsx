@@ -3,7 +3,7 @@ import * as IntentLauncher from "expo-intent-launcher";
 import * as Sharing from "expo-sharing";
 import { Stack, router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import { Alert, Image, ScrollView, View } from "react-native";
+import { Alert, Image, Pressable, ScrollView, View } from "react-native";
 import {
   Button as PaperButton,
   Chip,
@@ -18,12 +18,16 @@ import { MimeIcon } from "../../components/document-row";
 import { Card, Input, KeyValue, Muted, Row, TagChip, formatBytes, formatDate } from "../../components/ui";
 import { spacing, type AppTheme } from "../../constants/theme";
 import { getCachedDocument, upsertDocuments, type CachedDocument } from "../../lib/db";
+import { ImageViewer } from "../../components/image-viewer";
 import {
   addTagToDocument,
+  clearDocumentPropertyValue,
   getDocument,
+  listCustomProperties,
   listTags,
   removeTagFromDocument,
   renameDocument,
+  setDocumentPropertyValue,
   trashDocument,
   type PapraCustomProperty,
   type PapraDocument,
@@ -168,6 +172,63 @@ export default function DocumentScreen() {
     }
   };
 
+  // --- custom property value editing (text/number/date/boolean; selects and
+  // relations need option/entity pickers and stay web-app territory) ---
+  const [propEdit, setPropEdit] = useState<{ prop: PapraCustomProperty; defId: string; text: string } | null>(null);
+  const [propBusy, setPropBusy] = useState(false);
+  const [viewerOpen, setViewerOpen] = useState(false);
+
+  const openPropertyEditor = useCallback(async (prop: PapraCustomProperty) => {
+    if (["select", "multi_select", "user_relation", "document_relation"].includes(prop.type)) {
+      Alert.alert("Not editable here", "Select and relation properties are edited in the Papra web app.");
+      return;
+    }
+    try {
+      // The document carries the property's key; writes need the definition id.
+      const defs = await listCustomProperties();
+      const def = defs.find((d) => d.key === prop.key || d.id === prop.key);
+      if (!def) throw new Error("Property definition not found.");
+      const text = prop.value == null ? "" : prop.type === "date" ? String(prop.value).slice(0, 10) : String(prop.value);
+      setPropEdit({ prop, defId: def.id, text });
+    } catch (e) {
+      Alert.alert("Failed", e instanceof Error ? e.message : String(e));
+    }
+  }, []);
+
+  const finishPropEdit = useCallback(
+    async (action: () => Promise<void>) => {
+      setPropBusy(true);
+      try {
+        await action();
+        setPropEdit(null);
+        reload();
+      } catch (e) {
+        Alert.alert("Failed", e instanceof Error ? e.message : String(e));
+      } finally {
+        setPropBusy(false);
+      }
+    },
+    [reload],
+  );
+
+  const savePropEdit = () => {
+    if (!propEdit) return;
+    const { prop, defId, text } = propEdit;
+    finishPropEdit(async () => {
+      let value: unknown = text.trim();
+      if (prop.type === "number") {
+        value = Number(text.trim());
+        if (Number.isNaN(value)) throw new Error("Enter a number.");
+      }
+      if (prop.type === "date") {
+        const d = new Date(text.trim());
+        if (Number.isNaN(d.getTime())) throw new Error("Enter the date as YYYY-MM-DD.");
+        value = d.toISOString();
+      }
+      await setDocumentPropertyValue(id!, defId, value);
+    });
+  };
+
   const removeOffline = () => {
     Alert.alert(
       "Remove offline copy?",
@@ -218,10 +279,9 @@ export default function DocumentScreen() {
 
   const doc = { ...cached, ...live } as Partial<PapraDocument> & Partial<CachedDocument>;
   const tags = live?.tags ?? cached?.tags ?? [];
-  // One entry per org-wide property definition; only set values are shown.
-  const customProperties = (live?.customProperties ?? [])
-    .filter((prop) => prop.value !== null && prop.value !== undefined && prop.value !== "")
-    .sort((a, b) => a.displayOrder - b.displayOrder);
+  // One entry per org-wide property definition (value null when unset) — all
+  // shown, tappable to edit.
+  const customProperties = (live?.customProperties ?? []).slice().sort((a, b) => a.displayOrder - b.displayOrder);
   const isImage = (doc.mimeType ?? "").startsWith("image/") && Boolean(cached?.fileUri);
 
   return (
@@ -232,14 +292,19 @@ export default function DocumentScreen() {
       <Stack.Screen options={{ title: doc.name ?? "Document" }} />
       <View style={{ alignItems: "center", gap: spacing.sm }}>
         {isImage ? (
-          <Image
-            source={{ uri: cached!.fileUri! }}
-            style={{ width: "100%", height: 220, borderRadius: 16 }}
-            resizeMode="cover"
-          />
+          <Pressable onPress={() => setViewerOpen(true)} style={{ width: "100%" }}>
+            <Image
+              source={{ uri: cached!.fileUri! }}
+              style={{ width: "100%", height: 220, borderRadius: 16 }}
+              resizeMode="cover"
+            />
+          </Pressable>
         ) : (
           <MimeIcon mimeType={doc.mimeType ?? ""} size={64} />
         )}
+        {isImage ? (
+          <ImageViewer uri={cached!.fileUri!} visible={viewerOpen} onClose={() => setViewerOpen(false)} />
+        ) : null}
         <Row style={{ justifyContent: "center" }}>
           <Text variant="titleLarge" style={{ flexShrink: 1, textAlign: "center" }}>
             {doc.name ?? ""}
@@ -307,6 +372,52 @@ export default function DocumentScreen() {
             <PaperButton onPress={() => setTagPicker(null)}>Close</PaperButton>
           </Dialog.Actions>
         </Dialog>
+        <Dialog visible={propEdit !== null} onDismiss={() => setPropEdit(null)}>
+          <Dialog.Title>{propEdit?.prop.name ?? "Property"}</Dialog.Title>
+          <Dialog.Content style={{ gap: spacing.sm }}>
+            {propEdit?.prop.type === "boolean" ? (
+              <Muted>Set the value:</Muted>
+            ) : (
+              <Input
+                label={propEdit?.prop.type === "date" ? "YYYY-MM-DD" : "Value"}
+                keyboardType={propEdit?.prop.type === "number" ? "numeric" : "default"}
+                value={propEdit?.text ?? ""}
+                onChangeText={(t) => setPropEdit((p) => (p ? { ...p, text: t } : p))}
+                autoFocus
+              />
+            )}
+          </Dialog.Content>
+          <Dialog.Actions>
+            <PaperButton
+              disabled={propBusy || propEdit?.prop.value == null}
+              onPress={() => propEdit && finishPropEdit(() => clearDocumentPropertyValue(id!, propEdit.defId))}
+            >
+              Clear
+            </PaperButton>
+            <PaperButton onPress={() => setPropEdit(null)}>Cancel</PaperButton>
+            {propEdit?.prop.type === "boolean" ? (
+              <>
+                <PaperButton
+                  loading={propBusy}
+                  onPress={() => propEdit && finishPropEdit(() => setDocumentPropertyValue(id!, propEdit.defId, false))}
+                >
+                  No
+                </PaperButton>
+                <PaperButton
+                  mode="contained"
+                  loading={propBusy}
+                  onPress={() => propEdit && finishPropEdit(() => setDocumentPropertyValue(id!, propEdit.defId, true))}
+                >
+                  Yes
+                </PaperButton>
+              </>
+            ) : (
+              <PaperButton mode="contained" loading={propBusy} onPress={savePropEdit}>
+                Save
+              </PaperButton>
+            )}
+          </Dialog.Actions>
+        </Dialog>
         <Dialog visible={renameValue !== null} onDismiss={() => setRenameValue(null)}>
           <Dialog.Title>Rename document</Dialog.Title>
           <Dialog.Content>
@@ -323,10 +434,15 @@ export default function DocumentScreen() {
 
       {customProperties.length > 0 && (
         <Card>
-          <Muted>Properties</Muted>
+          <Muted>Properties (tap to edit)</Muted>
           <View style={{ marginTop: 8 }}>
             {customProperties.map((prop) => (
-              <KeyValue key={prop.key} label={prop.name || prop.key} value={formatPropertyValue(prop)} />
+              <Pressable key={prop.key} onPress={() => openPropertyEditor(prop)}>
+                <KeyValue
+                  label={prop.name || prop.key}
+                  value={prop.value == null || prop.value === "" ? "Not set" : formatPropertyValue(prop)}
+                />
+              </Pressable>
             ))}
           </View>
         </Card>

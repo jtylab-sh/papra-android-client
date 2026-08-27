@@ -1,6 +1,8 @@
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type PropsWithChildren } from "react";
 import { Alert, BackHandler, FlatList, RefreshControl, ScrollView, View } from "react-native";
+import ReanimatedSwipeable, { type SwipeableMethods } from "react-native-gesture-handler/ReanimatedSwipeable";
 import Share from "react-native-share";
 import {
   Button as PaperButton,
@@ -8,6 +10,7 @@ import {
   Dialog,
   FAB,
   IconButton,
+  Menu,
   Portal,
   Searchbar,
   Surface,
@@ -25,17 +28,29 @@ import {
   type CachedDocument,
 } from "../../lib/db";
 import {
+  batchTagsDocuments,
   batchTrashDocuments,
   createDocumentView,
   deleteDocumentView,
   listDocumentViews,
   listDocuments,
+  listTags,
+  trashDocument,
   type PapraDocumentView,
+  type PapraTag,
 } from "../../lib/papra";
 import { pickFiles, scanDocuments } from "../../lib/pickers";
 import { isPrintCancel, printDocument } from "../../lib/print";
 import { getSettings, isConnected } from "../../lib/settings";
 import { ensureLocalFile, localFileNamedForUser, syncMetadata } from "../../lib/sync";
+
+const SORTS = [
+  { label: "Newest first", field: "createdAt", order: "desc" },
+  { label: "Oldest first", field: "createdAt", order: "asc" },
+  { label: "Name A-Z", field: "name", order: "asc" },
+  { label: "Name Z-A", field: "name", order: "desc" },
+  { label: "Recently updated", field: "updatedAt", order: "desc" },
+] as const;
 
 export default function DocumentsScreen() {
   const theme = useTheme<AppTheme>();
@@ -49,13 +64,25 @@ export default function DocumentsScreen() {
   const [total, setTotal] = useState(0);
   // Filter: only documents whose blob is not on the phone yet (local-only view).
   const [notSynced, setNotSynced] = useState(false);
+  const [sortIndex, setSortIndex] = useState(0);
+  const [sortMenu, setSortMenu] = useState(false);
 
   const loadLocal = useCallback(
-    (q: string, unsyncedOnly = notSynced) => {
-      setDocs(listCachedDocuments(q, PAGE, 0, unsyncedOnly ? false : undefined));
+    (q: string, unsyncedOnly = notSynced, sort = SORTS[sortIndex]) => {
+      setDocs(listCachedDocuments(q, PAGE, 0, unsyncedOnly ? false : undefined, sort));
       setTotal(countCachedDocuments(q, unsyncedOnly ? false : undefined));
     },
-    [notSynced],
+    [notSynced, sortIndex],
+  );
+
+  const applySort = useCallback(
+    (i: number) => {
+      setSortMenu(false);
+      setSortIndex(i);
+      setServerMode(false);
+      loadLocal(search, notSynced, SORTS[i]);
+    },
+    [search, notSynced, loadLocal],
   );
 
   useFocusEffect(
@@ -71,6 +98,9 @@ export default function DocumentsScreen() {
         loadLocal(search);
         listDocumentViews()
           .then((v) => active && setViews(v))
+          .catch(() => {});
+        listTags()
+          .then((t) => active && setAllTags(t))
           .catch(() => {});
         // First run: pull metadata so the list isn't empty.
         if (countCachedDocuments() === 0) {
@@ -107,10 +137,20 @@ export default function DocumentsScreen() {
   const SEARCH_PAGE = 25;
   const [serverMode, setServerMode] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Ref keeps runServerSearch stable while still reading the current sort.
+  const sortIndexRef = useRef(0);
+  sortIndexRef.current = sortIndex;
 
   const runServerSearch = useCallback(async (q: string, pageIndex = 0) => {
     try {
-      const { documents, documentsCount } = await listDocuments({ searchQuery: q, pageIndex, pageSize: SEARCH_PAGE });
+      const sort = SORTS[sortIndexRef.current];
+      const { documents, documentsCount } = await listDocuments({
+        searchQuery: q,
+        pageIndex,
+        pageSize: SEARCH_PAGE,
+        sortField: sort.field,
+        sortOrder: sort.order,
+      });
       upsertDocuments(documents);
       // Re-read through the cache so rows carry offline state, server order kept.
       const found = documents.map((d) => getCachedDocument(d.id)).filter((d): d is CachedDocument => d !== null);
@@ -145,11 +185,93 @@ export default function DocumentsScreen() {
     }
     setDocs((prev) => {
       if (prev.length >= total) return prev;
-      return [...prev, ...listCachedDocuments(search, PAGE, prev.length, notSynced ? false : undefined)];
+      return [...prev, ...listCachedDocuments(search, PAGE, prev.length, notSynced ? false : undefined, SORTS[sortIndex])];
     });
-  }, [serverMode, docs.length, search, total, runServerSearch, notSynced]);
+  }, [serverMode, docs.length, search, total, runServerSearch, notSynced, sortIndex]);
 
   const [fabOpen, setFabOpen] = useState(false);
+
+  const startScan = useCallback(async () => {
+    // Native UI first; the upload page only opens with results, so cancelling
+    // never leaves an empty page in the back stack.
+    const files = await scanDocuments();
+    if (files.length) router.push({ pathname: "/upload", params: { files: JSON.stringify(files) } });
+  }, []);
+
+  const startUpload = useCallback(async () => {
+    const files = await pickFiles();
+    if (files.length) router.push({ pathname: "/upload", params: { files: JSON.stringify(files) } });
+  }, []);
+
+  // --- swipe actions on rows ---
+  const swipeDownload = useCallback(
+    async (docId: string) => {
+      try {
+        await ensureLocalFile(docId);
+        loadLocal(search);
+      } catch (e) {
+        Alert.alert("Failed", e instanceof Error ? e.message : String(e));
+      }
+    },
+    [search, loadLocal],
+  );
+
+  const swipeTrash = useCallback(
+    (docId: string) => {
+      const name = getCachedDocument(docId)?.name ?? "";
+      Alert.alert("Move to trash?", `${name}\n\nIt stays in the trash for 30 days, then it is deleted permanently.`, [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Trash",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await trashDocument(docId);
+              await syncMetadata();
+              loadLocal(search);
+            } catch (e) {
+              Alert.alert("Failed", e instanceof Error ? e.message : String(e));
+            }
+          },
+        },
+      ]);
+    },
+    [search, loadLocal],
+  );
+
+  // --- tags: filter chips + batch add/remove in multi-select ---
+  const [allTags, setAllTags] = useState<PapraTag[]>([]);
+  const [tagEdit, setTagEdit] = useState<{ add: Set<string>; remove: Set<string> } | null>(null);
+  const [tagBusy, setTagBusy] = useState(false);
+
+  const openTagEdit = useCallback(async () => {
+    if (allTags.length === 0) {
+      try {
+        setAllTags(await listTags());
+      } catch (e) {
+        Alert.alert("Failed", e instanceof Error ? e.message : String(e));
+        return;
+      }
+    }
+    setTagEdit({ add: new Set(), remove: new Set() });
+  }, [allTags.length]);
+
+  const cycleTag = useCallback((tagId: string) => {
+    setTagEdit((prev) => {
+      if (!prev) return prev;
+      const add = new Set(prev.add);
+      const remove = new Set(prev.remove);
+      if (add.has(tagId)) {
+        add.delete(tagId);
+        remove.add(tagId);
+      } else if (remove.has(tagId)) {
+        remove.delete(tagId);
+      } else {
+        add.add(tagId);
+      }
+      return { add, remove };
+    });
+  }, []);
 
   // --- views (saved searches, like the Papra sidebar) ---
   const [views, setViews] = useState<PapraDocumentView[]>([]);
@@ -241,6 +363,23 @@ export default function DocumentsScreen() {
     }
   }, [selected]);
 
+  const applyTagEdit = useCallback(async () => {
+    const ids = [...(selected ?? [])];
+    if (!tagEdit || ids.length === 0) return;
+    setTagBusy(true);
+    try {
+      await batchTagsDocuments(ids, [...tagEdit.add], [...tagEdit.remove]);
+      setTagEdit(null);
+      setSelected(null);
+      await syncMetadata();
+      loadLocal(search);
+    } catch (e) {
+      Alert.alert("Failed", e instanceof Error ? e.message : String(e));
+    } finally {
+      setTagBusy(false);
+    }
+  }, [selected, tagEdit, search, loadLocal]);
+
   const massPrint = useCallback(async () => {
     const ids = [...(selected ?? [])];
     for (let i = 0; i < ids.length; i++) {
@@ -311,6 +450,7 @@ export default function DocumentsScreen() {
             {massProgress || `${selected.size} selected`}
           </Text>
           <IconButton icon="select-all" disabled={!!massProgress} onPress={selectAll} />
+          <IconButton icon="tag-multiple-outline" disabled={!!massProgress} onPress={openTagEdit} />
           <IconButton icon="share-variant-outline" disabled={!!massProgress} onPress={massShare} />
           <IconButton icon="printer-outline" disabled={!!massProgress} onPress={massPrint} />
           <IconButton icon="cloud-download-outline" disabled={!!massProgress} onPress={massDownload} />
@@ -329,6 +469,24 @@ export default function DocumentsScreen() {
         />
         {!selected ? (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: spacing.sm }}>
+            <Menu
+              visible={sortMenu}
+              onDismiss={() => setSortMenu(false)}
+              anchor={
+                <Chip compact icon="sort" mode="outlined" onPress={() => setSortMenu(true)} style={{ marginRight: 6 }}>
+                  {SORTS[sortIndex].label}
+                </Chip>
+              }
+            >
+              {SORTS.map((s, i) => (
+                <Menu.Item
+                  key={s.label}
+                  title={s.label}
+                  trailingIcon={i === sortIndex ? "check" : undefined}
+                  onPress={() => applySort(i)}
+                />
+              ))}
+            </Menu>
             <Chip
               compact
               icon="cloud-off-outline"
@@ -343,6 +501,22 @@ export default function DocumentsScreen() {
             >
               Not synced
             </Chip>
+            {allTags.map((t) => {
+              const q = `tag:"${t.name}"`;
+              const activeTag = search.trim() === q;
+              return (
+                <Chip
+                  key={t.id}
+                  compact
+                  icon="tag-outline"
+                  mode={activeTag ? "flat" : "outlined"}
+                  onPress={() => onSearchChange(activeTag ? "" : q)}
+                  style={{ marginRight: 6 }}
+                >
+                  {t.name}
+                </Chip>
+              );
+            })}
             {views.map((v) => (
               <Chip
                 key={v.id}
@@ -364,7 +538,23 @@ export default function DocumentsScreen() {
         keyExtractor={(d) => d.id}
         contentContainerStyle={{ padding: spacing.md }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={theme.colors.primary} />}
-        ListEmptyComponent={<Muted>No documents. Pull to refresh.</Muted>}
+        ListEmptyComponent={
+          <View style={{ gap: spacing.md }}>
+            <Muted>No documents yet. Pull to refresh, or add your first one.</Muted>
+            <View style={{ flexDirection: "row", gap: spacing.sm }}>
+              <View style={{ flex: 1 }}>
+                <PaperButton mode="outlined" icon="line-scan" onPress={startScan}>
+                  Scan
+                </PaperButton>
+              </View>
+              <View style={{ flex: 1 }}>
+                <PaperButton mode="outlined" icon="file-upload-outline" onPress={startUpload}>
+                  Upload
+                </PaperButton>
+              </View>
+            </View>
+          </View>
+        }
         onEndReached={loadMore}
         onEndReachedThreshold={0.5}
         ListFooterComponent={
@@ -376,12 +566,18 @@ export default function DocumentsScreen() {
           ) : null
         }
         renderItem={({ item }) => (
-          <DocumentRow
-            doc={item}
-            selected={selected?.has(item.id) ?? false}
-            onPress={() => (selected ? toggleSelect(item.id) : router.push(`/document/${item.id}`))}
-            onLongPress={() => toggleSelect(item.id)}
-          />
+          <SwipeableRow
+            disabled={selected !== null}
+            onDownload={() => swipeDownload(item.id)}
+            onTrash={() => swipeTrash(item.id)}
+          >
+            <DocumentRow
+              doc={item}
+              selected={selected?.has(item.id) ?? false}
+              onPress={() => (selected ? toggleSelect(item.id) : router.push(`/document/${item.id}`))}
+              onLongPress={() => toggleSelect(item.id)}
+            />
+          </SwipeableRow>
         )}
       />
       <Portal>
@@ -390,27 +586,45 @@ export default function DocumentsScreen() {
           visible={selected === null}
           icon={fabOpen ? "close" : "plus"}
           actions={[
-            {
-              icon: "line-scan",
-              label: "Scan",
-              // Native UI first; the upload page only opens with results, so
-              // cancelling never leaves an empty page in the back stack.
-              onPress: async () => {
-                const files = await scanDocuments();
-                if (files.length) router.push({ pathname: "/upload", params: { files: JSON.stringify(files) } });
-              },
-            },
-            {
-              icon: "file-upload-outline",
-              label: "Upload",
-              onPress: async () => {
-                const files = await pickFiles();
-                if (files.length) router.push({ pathname: "/upload", params: { files: JSON.stringify(files) } });
-              },
-            },
+            { icon: "line-scan", label: "Scan", onPress: startScan },
+            { icon: "file-upload-outline", label: "Upload", onPress: startUpload },
           ]}
           onStateChange={({ open }) => setFabOpen(open)}
         />
+        <Dialog visible={tagEdit !== null} onDismiss={() => setTagEdit(null)}>
+          <Dialog.Title>Tags for {selected?.size ?? 0} documents</Dialog.Title>
+          <Dialog.Content>
+            <Muted>Tap a tag to cycle: add, remove, leave unchanged.</Muted>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", marginTop: spacing.sm }}>
+              {allTags.map((t) => {
+                const mode = tagEdit?.add.has(t.id) ? "add" : tagEdit?.remove.has(t.id) ? "remove" : "none";
+                return (
+                  <Chip
+                    key={t.id}
+                    compact
+                    icon={mode === "add" ? "plus" : mode === "remove" ? "minus" : undefined}
+                    mode={mode === "none" ? "outlined" : "flat"}
+                    onPress={() => cycleTag(t.id)}
+                    style={{ marginRight: 6, marginBottom: 6 }}
+                  >
+                    {t.name}
+                  </Chip>
+                );
+              })}
+            </View>
+          </Dialog.Content>
+          <Dialog.Actions>
+            <PaperButton onPress={() => setTagEdit(null)}>Cancel</PaperButton>
+            <PaperButton
+              mode="contained"
+              loading={tagBusy}
+              disabled={!tagEdit || (tagEdit.add.size === 0 && tagEdit.remove.size === 0)}
+              onPress={applyTagEdit}
+            >
+              Apply
+            </PaperButton>
+          </Dialog.Actions>
+        </Dialog>
         <Dialog visible={viewName !== null} onDismiss={() => setViewName(null)}>
           <Dialog.Title>Save view</Dialog.Title>
           <Dialog.Content style={{ gap: spacing.sm }}>
@@ -426,5 +640,44 @@ export default function DocumentsScreen() {
         </Dialog>
       </Portal>
     </View>
+  );
+}
+
+/** Swipe right = download offline, swipe left = trash. Disabled in selection mode. */
+function SwipeableRow({
+  disabled,
+  onDownload,
+  onTrash,
+  children,
+}: PropsWithChildren<{ disabled: boolean; onDownload: () => void; onTrash: () => void }>) {
+  const theme = useTheme<AppTheme>();
+  const swipeRef = useRef<SwipeableMethods>(null);
+  if (disabled) return <>{children}</>;
+  return (
+    <ReanimatedSwipeable
+      ref={swipeRef}
+      friction={2}
+      leftThreshold={60}
+      rightThreshold={60}
+      overshootLeft={false}
+      overshootRight={false}
+      renderLeftActions={() => (
+        <View style={{ justifyContent: "center", paddingHorizontal: 24 }}>
+          <MaterialCommunityIcons name="cloud-download-outline" size={24} color={theme.colors.primary} />
+        </View>
+      )}
+      renderRightActions={() => (
+        <View style={{ justifyContent: "center", paddingHorizontal: 24, alignItems: "flex-end" }}>
+          <MaterialCommunityIcons name="trash-can-outline" size={24} color={theme.colors.error} />
+        </View>
+      )}
+      onSwipeableOpen={(direction) => {
+        swipeRef.current?.close();
+        if (direction === "left") onDownload();
+        else onTrash();
+      }}
+    >
+      <View style={{ backgroundColor: theme.colors.background }}>{children}</View>
+    </ReanimatedSwipeable>
   );
 }
