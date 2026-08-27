@@ -1,14 +1,17 @@
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Stack, router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
-import { FlatList, Pressable, RefreshControl, Text, View } from "react-native";
-import { Button, Input, Muted, Row, TagChip, formatBytes, formatDate } from "../components/ui";
-import { colors, spacing } from "../constants/theme";
+import { FlatList, RefreshControl, View } from "react-native";
+import { Card, IconButton, Text, useTheme } from "react-native-paper";
+import { Input, Muted, Row, TagChip, formatBytes, formatDate } from "../components/ui";
+import { spacing, type AppTheme } from "../constants/theme";
 import { listCachedDocuments, type CachedDocument } from "../lib/db";
 import { listDocuments } from "../lib/papra";
 import { getSettings, isConnected } from "../lib/settings";
 import { syncMetadata, upsertFromSearch } from "../lib/screens-helpers";
 
 export default function DocumentsScreen() {
+  const theme = useTheme<AppTheme>();
   const [search, setSearch] = useState("");
   const [docs, setDocs] = useState<CachedDocument[]>([]);
   const [refreshing, setRefreshing] = useState(false);
@@ -68,19 +71,22 @@ export default function DocumentsScreen() {
     }
   }, [search, loadLocal]);
 
-  if (!ready) return <View style={{ flex: 1, backgroundColor: colors.bg }} />;
+  if (!ready) return <View style={{ flex: 1, backgroundColor: theme.colors.background }} />;
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+    <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
       <Stack.Screen
         options={{
           title: "Documents",
           headerRight: () => (
-            <Row>
-              <HeaderLink label="Scan" onPress={() => router.push({ pathname: "/upload", params: { mode: "scan" } })} />
-              <HeaderLink label="Add" onPress={() => router.push({ pathname: "/upload", params: { mode: "pick" } })} />
-              <HeaderLink label="Trash" onPress={() => router.push("/trash")} />
-              <HeaderLink label="⚙" onPress={() => router.push("/settings")} />
+            <Row style={{ gap: 0 }}>
+              <IconButton
+                icon="line-scan"
+                onPress={() => router.push({ pathname: "/upload", params: { mode: "scan" } })}
+              />
+              <IconButton icon="plus" onPress={() => router.push({ pathname: "/upload", params: { mode: "pick" } })} />
+              <IconButton icon="trash-can-outline" onPress={() => router.push("/trash")} />
+              <IconButton icon="cog-outline" onPress={() => router.push("/settings")} />
             </Row>
           ),
         }}
@@ -101,7 +107,7 @@ export default function DocumentsScreen() {
         data={docs}
         keyExtractor={(d) => d.id}
         contentContainerStyle={{ padding: spacing.md }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.primary} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={theme.colors.primary} />}
         ListEmptyComponent={<Muted>No documents. Pull to refresh.</Muted>}
         renderItem={({ item }) => <DocumentRow doc={item} />}
       />
@@ -109,42 +115,32 @@ export default function DocumentsScreen() {
   );
 }
 
-function HeaderLink({ label, onPress }: { label: string; onPress: () => void }) {
-  return (
-    <Pressable onPress={onPress} hitSlop={8} style={{ paddingHorizontal: 6 }}>
-      <Text style={{ color: colors.primary, fontSize: 15, fontWeight: "600" }}>{label}</Text>
-    </Pressable>
-  );
-}
-
 function DocumentRow({ doc }: { doc: CachedDocument }) {
+  const theme = useTheme<AppTheme>();
   return (
-    <Pressable
-      onPress={() => router.push(`/document/${doc.id}`)}
-      style={({ pressed }) => ({
-        backgroundColor: pressed ? colors.surfaceHigh : colors.surface,
-        borderColor: colors.border,
-        borderWidth: 1,
-        borderRadius: 12,
-        padding: spacing.md,
-        marginBottom: spacing.sm,
-      })}
-    >
-      <Text style={{ color: colors.text, fontSize: 15, fontWeight: "600" }} numberOfLines={1}>
-        {doc.name}
-      </Text>
-      <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 2 }}>
-        {formatDate(doc.createdAt)}
-        {doc.originalSize ? `  ·  ${formatBytes(doc.originalSize)}` : ""}
-        {doc.fileUri ? "  ·  ● offline" : ""}
-      </Text>
-      {doc.tags.length > 0 && (
-        <View style={{ flexDirection: "row", flexWrap: "wrap", marginTop: 8 }}>
-          {doc.tags.map((t) => (
-            <TagChip key={t.id} name={t.name} color={t.color} />
-          ))}
-        </View>
-      )}
-    </Pressable>
+    <Card mode="contained" style={{ marginBottom: spacing.sm }} onPress={() => router.push(`/document/${doc.id}`)}>
+      <Card.Content>
+        <Text variant="titleSmall" numberOfLines={1}>
+          {doc.name}
+        </Text>
+        <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant, marginTop: 2 }}>
+          {formatDate(doc.createdAt)}
+          {doc.originalSize ? `  ·  ${formatBytes(doc.originalSize)}` : ""}
+          {doc.fileUri ? (
+            <>
+              {"  ·  "}
+              <MaterialCommunityIcons name="cloud-check-outline" size={14} color={theme.colors.primary} />
+            </>
+          ) : null}
+        </Text>
+        {doc.tags.length > 0 && (
+          <View style={{ flexDirection: "row", flexWrap: "wrap", marginTop: 8 }}>
+            {doc.tags.map((t) => (
+              <TagChip key={t.id} name={t.name} color={t.color} />
+            ))}
+          </View>
+        )}
+      </Card.Content>
+    </Card>
   );
 }

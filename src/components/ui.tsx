@@ -1,27 +1,37 @@
-/** Tiny dark-mode UI kit — enough for this app, no component library. */
+/** Tiny UI kit on top of react-native-paper — same API the screens already use. */
 import type { PropsWithChildren } from "react";
+import { StyleSheet, View, type ViewStyle } from "react-native";
 import {
-  ActivityIndicator,
-  Pressable,
-  StyleSheet,
+  Button as PaperButton,
+  Chip,
+  Surface,
   Text,
   TextInput,
-  View,
+  useTheme,
   type TextInputProps,
-  type ViewStyle,
-} from "react-native";
-import { colors, radius, spacing } from "../constants/theme";
+} from "react-native-paper";
+import { radius, spacing, type AppTheme } from "../constants/theme";
 
 export function Screen({ children, style }: PropsWithChildren<{ style?: ViewStyle }>) {
-  return <View style={[styles.screen, style]}>{children}</View>;
+  const theme = useTheme<AppTheme>();
+  return <View style={[styles.screen, { backgroundColor: theme.colors.background }, style]}>{children}</View>;
 }
 
 export function Title({ children }: PropsWithChildren) {
-  return <Text style={styles.title}>{children}</Text>;
+  return (
+    <Text variant="headlineMedium" style={styles.title}>
+      {children}
+    </Text>
+  );
 }
 
 export function Muted({ children }: PropsWithChildren) {
-  return <Text style={styles.muted}>{children}</Text>;
+  const theme = useTheme<AppTheme>();
+  return (
+    <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant }}>
+      {children}
+    </Text>
+  );
 }
 
 export function Button({
@@ -37,40 +47,41 @@ export function Button({
   disabled?: boolean;
   loading?: boolean;
 }) {
+  const theme = useTheme<AppTheme>();
   return (
-    <Pressable
+    <PaperButton
+      mode={kind === "ghost" ? "outlined" : "contained"}
       onPress={onPress}
       disabled={disabled || loading}
-      style={({ pressed }) => [
-        styles.button,
-        kind === "primary" && { backgroundColor: colors.primary },
-        kind === "ghost" && { backgroundColor: colors.surfaceHigh },
-        kind === "danger" && { backgroundColor: colors.danger },
-        (pressed || disabled || loading) && { opacity: 0.6 },
-      ]}
+      loading={loading}
+      buttonColor={kind === "danger" ? theme.colors.error : undefined}
+      textColor={kind === "danger" ? theme.colors.onError : undefined}
     >
-      {loading ? (
-        <ActivityIndicator color={kind === "ghost" ? colors.text : "#06231a"} />
-      ) : (
-        <Text style={[styles.buttonLabel, kind === "ghost" && { color: colors.text }]}>{label}</Text>
-      )}
-    </Pressable>
+      {label}
+    </PaperButton>
   );
 }
 
 export function Input(props: TextInputProps) {
-  return <TextInput placeholderTextColor={colors.textMuted} {...props} style={[styles.input, props.style]} />;
+  return <TextInput mode="outlined" dense {...props} />;
 }
 
 export function Card({ children, style }: PropsWithChildren<{ style?: ViewStyle }>) {
-  return <View style={[styles.card, style]}>{children}</View>;
+  return (
+    <Surface elevation={1} style={[styles.card, style]}>
+      {children}
+    </Surface>
+  );
 }
 
 export function TagChip({ name, color }: { name: string; color?: string }) {
+  const theme = useTheme<AppTheme>();
+  // Tags carry a server-defined hex colour — keep it as the chip's own tint.
+  const tint = color || theme.colors.primary;
   return (
-    <View style={[styles.chip, { borderColor: color || colors.primary }]}>
-      <Text style={[styles.chipText, { color: color || colors.primary }]}>{name}</Text>
-    </View>
+    <Chip mode="outlined" compact style={[styles.chip, { borderColor: tint }]} textStyle={{ color: tint }}>
+      {name}
+    </Chip>
   );
 }
 
@@ -79,11 +90,14 @@ export function Row({ children, style }: PropsWithChildren<{ style?: ViewStyle }
 }
 
 export function KeyValue({ label, value }: { label: string; value: string }) {
+  const theme = useTheme<AppTheme>();
   if (!value) return null;
   return (
     <View style={styles.kv}>
-      <Text style={styles.kvLabel}>{label}</Text>
-      <Text style={styles.kvValue} selectable>
+      <Text variant="labelSmall" style={[styles.kvLabel, { color: theme.colors.onSurfaceVariant }]}>
+        {label}
+      </Text>
+      <Text variant="bodyMedium" selectable>
         {value}
       </Text>
     </View>
@@ -109,45 +123,11 @@ export function formatDate(iso: string): string {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.bg, padding: spacing.md },
-  title: { color: colors.text, fontSize: 24, fontWeight: "700", marginBottom: spacing.md },
-  muted: { color: colors.textMuted, fontSize: 14 },
-  button: {
-    borderRadius: radius.md,
-    paddingVertical: 12,
-    paddingHorizontal: spacing.md,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  buttonLabel: { color: "#06231a", fontWeight: "700", fontSize: 15 },
-  input: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: radius.md,
-    color: colors.text,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 10,
-    fontSize: 15,
-  },
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.md,
-  },
-  chip: {
-    borderWidth: 1,
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-    marginRight: 6,
-    marginBottom: 6,
-  },
-  chipText: { fontSize: 12, fontWeight: "600" },
+  screen: { flex: 1, padding: spacing.md },
+  title: { marginBottom: spacing.md },
+  card: { borderRadius: radius.lg, padding: spacing.md },
+  chip: { marginRight: 6, marginBottom: 6 },
   row: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   kv: { marginBottom: spacing.sm },
-  kvLabel: { color: colors.textMuted, fontSize: 12, textTransform: "uppercase", marginBottom: 2 },
-  kvValue: { color: colors.text, fontSize: 15 },
+  kvLabel: { textTransform: "uppercase", marginBottom: 2 },
 });

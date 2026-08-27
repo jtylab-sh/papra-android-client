@@ -1,8 +1,9 @@
 import { Stack, router } from "expo-router";
 import { useCallback, useState } from "react";
-import { KeyboardAvoidingView, Pressable, ScrollView, Text, View } from "react-native";
+import { KeyboardAvoidingView, ScrollView, View } from "react-native";
+import { Card, Text, useTheme } from "react-native-paper";
 import { Button, Input, Muted, Title } from "../components/ui";
-import { colors, radius, spacing } from "../constants/theme";
+import { spacing, type AppTheme } from "../constants/theme";
 import { getAuthClient } from "../lib/auth";
 import { listOrganizations, type PapraOrganization } from "../lib/papra";
 import { normalizeServerUrl, saveSettings, type Settings } from "../lib/settings";
@@ -27,6 +28,7 @@ function draftSettings(serverUrl: string): Settings {
 type Step = "credentials" | "totp" | "org";
 
 export default function SignInScreen() {
+  const theme = useTheme<AppTheme>();
   const [step, setStep] = useState<Step>("credentials");
   const [serverUrl, setServerUrl] = useState("");
   const [email, setEmail] = useState("");
@@ -93,31 +95,27 @@ export default function SignInScreen() {
 
   if (step === "org") {
     return (
-      <View style={{ flex: 1, backgroundColor: colors.bg, padding: spacing.md }}>
+      <View style={{ flex: 1, backgroundColor: theme.colors.background, padding: spacing.md }}>
         <Stack.Screen options={{ headerShown: false }} />
         <Title>Pick organization</Title>
         {orgs.map((org) => (
-          <Pressable
+          <Card
             key={org.id}
+            mode="contained"
+            style={{ marginBottom: spacing.sm }}
             onPress={() => draft && finish(draft, org)}
-            style={{
-              backgroundColor: colors.surface,
-              borderColor: colors.border,
-              borderWidth: 1,
-              borderRadius: radius.md,
-              padding: spacing.md,
-              marginBottom: spacing.sm,
-            }}
           >
-            <Text style={{ color: colors.text, fontSize: 16 }}>{org.name}</Text>
-          </Pressable>
+            <Card.Content>
+              <Text variant="titleMedium">{org.name}</Text>
+            </Card.Content>
+          </Card>
         ))}
       </View>
     );
   }
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.bg }} behavior="padding">
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: theme.colors.background }} behavior="padding">
       <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.md, flexGrow: 1, justifyContent: "center" }}>
         <Stack.Screen options={{ headerShown: false }} />
         <Title>Papra</Title>
@@ -143,7 +141,7 @@ export default function SignInScreen() {
               onChangeText={setEmail}
             />
             <Input placeholder="Password" secureTextEntry autoComplete="current-password" value={password} onChangeText={setPassword} />
-            {error ? <Text style={{ color: colors.danger }}>{error}</Text> : null}
+            {error ? <Text style={{ color: theme.colors.error }}>{error}</Text> : null}
             <Button label="Sign in" onPress={connect} loading={busy} />
           </>
         ) : (
@@ -159,7 +157,7 @@ export default function SignInScreen() {
               onChangeText={setCode}
               autoFocus
             />
-            {error ? <Text style={{ color: colors.danger }}>{error}</Text> : null}
+            {error ? <Text style={{ color: theme.colors.error }}>{error}</Text> : null}
             <Button label="Verify" onPress={verifyTotp} loading={busy} disabled={code.trim().length !== 6} />
             <Button label="Back" kind="ghost" onPress={() => setStep("credentials")} />
           </>

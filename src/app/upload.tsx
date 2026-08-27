@@ -1,10 +1,11 @@
 import * as DocumentPicker from "expo-document-picker";
 import { Stack, router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import { FlatList, Text, View } from "react-native";
+import { FlatList, View } from "react-native";
 import DocumentScanner from "react-native-document-scanner-plugin";
-import { Button, Muted, Row } from "../components/ui";
-import { colors, spacing } from "../constants/theme";
+import { Text, useTheme } from "react-native-paper";
+import { Button, Card, Muted, Row } from "../components/ui";
+import { spacing, type AppTheme } from "../constants/theme";
 import { uploadDocument } from "../lib/papra";
 import { syncMetadata } from "../lib/sync";
 
@@ -17,6 +18,7 @@ interface PendingFile {
 }
 
 export default function UploadScreen() {
+  const theme = useTheme<AppTheme>();
   const params = useLocalSearchParams<{ files?: string; mode?: string }>();
   const [files, setFiles] = useState<PendingFile[]>([]);
   const [busy, setBusy] = useState(false);
@@ -94,10 +96,15 @@ export default function UploadScreen() {
   }, [files]);
 
   const allDone = files.length > 0 && files.every((f) => f.status === "done");
-  const statusColor = { pending: colors.textMuted, uploading: colors.warning, done: colors.primary, failed: colors.danger };
+  const statusColor = {
+    pending: theme.colors.onSurfaceVariant,
+    uploading: theme.colors.tertiary,
+    done: theme.colors.primary,
+    failed: theme.colors.error,
+  };
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.bg, padding: spacing.md }}>
+    <View style={{ flex: 1, backgroundColor: theme.colors.background, padding: spacing.md }}>
       <Stack.Screen options={{ title: "Upload" }} />
       <Row style={{ marginBottom: spacing.md }}>
         <View style={{ flex: 1 }}>
@@ -112,24 +119,15 @@ export default function UploadScreen() {
         keyExtractor={(f, i) => `${f.uri}-${i}`}
         ListEmptyComponent={<Muted>Nothing selected yet.</Muted>}
         renderItem={({ item }) => (
-          <View
-            style={{
-              backgroundColor: colors.surface,
-              borderColor: colors.border,
-              borderWidth: 1,
-              borderRadius: 10,
-              padding: spacing.md,
-              marginBottom: spacing.sm,
-            }}
-          >
-            <Text style={{ color: colors.text }} numberOfLines={1}>
+          <Card style={{ marginBottom: spacing.sm }}>
+            <Text variant="bodyLarge" numberOfLines={1}>
               {item.name}
             </Text>
-            <Text style={{ color: statusColor[item.status], fontSize: 12, marginTop: 2 }}>
+            <Text variant="bodySmall" style={{ color: statusColor[item.status], marginTop: 2 }}>
               {item.status}
               {item.error ? ` — ${item.error}` : ""}
             </Text>
-          </View>
+          </Card>
         )}
       />
       {allDone ? (

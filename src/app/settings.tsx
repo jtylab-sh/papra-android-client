@@ -1,9 +1,10 @@
 import * as LocalAuthentication from "expo-local-authentication";
 import { Stack, router } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import { Alert, Pressable, ScrollView, Switch, Text, View } from "react-native";
+import { Alert, ScrollView, View } from "react-native";
+import { Chip, Switch, Text, useTheme } from "react-native-paper";
 import { Button, Card, KeyValue, Muted, Row } from "../components/ui";
-import { colors, radius, spacing } from "../constants/theme";
+import { spacing, type AppTheme } from "../constants/theme";
 import { getAuthClient } from "../lib/auth";
 import { getMeta } from "../lib/db";
 import { clearSettings, getSettings, saveSettings, type Settings } from "../lib/settings";
@@ -26,6 +27,7 @@ const INTERVALS: { label: string; minutes: number }[] = [
 ];
 
 export default function SettingsScreen() {
+  const theme = useTheme<AppTheme>();
   const [settings, setSettings] = useState<Settings | null>(null);
   const [progress, setProgress] = useState<string>("");
   const [syncing, setSyncing] = useState(false);
@@ -99,10 +101,13 @@ export default function SettingsScreen() {
     ]);
   }, []);
 
-  if (!settings) return <View style={{ flex: 1, backgroundColor: colors.bg }} />;
+  if (!settings) return <View style={{ flex: 1, backgroundColor: theme.colors.background }} />;
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: colors.bg }} contentContainerStyle={{ padding: spacing.md, gap: spacing.md }}>
+    <ScrollView
+      style={{ flex: 1, backgroundColor: theme.colors.background }}
+      contentContainerStyle={{ padding: spacing.md, gap: spacing.md }}
+    >
       <Stack.Screen options={{ title: "Settings" }} />
 
       <Card>
@@ -116,51 +121,36 @@ export default function SettingsScreen() {
 
       <Card>
         <Row style={{ justifyContent: "space-between" }}>
-          <Text style={{ color: colors.text, fontSize: 16, fontWeight: "600" }}>Offline sync</Text>
-          <Switch
-            value={settings.syncEnabled}
-            onValueChange={(v) => update({ syncEnabled: v }, true)}
-            trackColor={{ true: colors.primaryDim, false: colors.border }}
-            thumbColor={settings.syncEnabled ? colors.primary : colors.textMuted}
-          />
+          <Text variant="titleMedium">Offline sync</Text>
+          <Switch value={settings.syncEnabled} onValueChange={(v: boolean) => update({ syncEnabled: v }, true)} />
         </Row>
         <Muted>Mirrors every document to this phone in the background.</Muted>
 
         {settings.syncEnabled && (
           <>
-            <Text style={{ color: colors.textMuted, marginTop: spacing.md, marginBottom: 6, fontSize: 12 }}>
+            <Text
+              variant="labelMedium"
+              style={{ color: theme.colors.onSurfaceVariant, marginTop: spacing.md, marginBottom: 6 }}
+            >
               CADENCE (Android decides the exact moment)
             </Text>
             <Row style={{ flexWrap: "wrap" }}>
-              {INTERVALS.map((opt) => {
-                const active = settings.syncIntervalMinutes === opt.minutes;
-                return (
-                  <Pressable
-                    key={opt.minutes}
-                    onPress={() => update({ syncIntervalMinutes: opt.minutes }, true)}
-                    style={{
-                      backgroundColor: active ? colors.primary : colors.surfaceHigh,
-                      borderRadius: radius.sm,
-                      paddingHorizontal: 12,
-                      paddingVertical: 6,
-                      marginBottom: 6,
-                    }}
-                  >
-                    <Text style={{ color: active ? "#06231a" : colors.text, fontWeight: "600", fontSize: 13 }}>
-                      {opt.label}
-                    </Text>
-                  </Pressable>
-                );
-              })}
+              {INTERVALS.map((opt) => (
+                <Chip
+                  key={opt.minutes}
+                  compact
+                  showSelectedCheck={false}
+                  selected={settings.syncIntervalMinutes === opt.minutes}
+                  onPress={() => update({ syncIntervalMinutes: opt.minutes }, true)}
+                  style={{ marginBottom: 6 }}
+                >
+                  {opt.label}
+                </Chip>
+              ))}
             </Row>
             <Row style={{ justifyContent: "space-between", marginTop: spacing.sm }}>
-              <Text style={{ color: colors.text }}>Wi-Fi only</Text>
-              <Switch
-                value={settings.syncWifiOnly}
-                onValueChange={(v) => update({ syncWifiOnly: v })}
-                trackColor={{ true: colors.primaryDim, false: colors.border }}
-                thumbColor={settings.syncWifiOnly ? colors.primary : colors.textMuted}
-              />
+              <Text variant="bodyLarge">Wi-Fi only</Text>
+              <Switch value={settings.syncWifiOnly} onValueChange={(v: boolean) => update({ syncWifiOnly: v })} />
             </Row>
           </>
         )}
@@ -174,41 +164,31 @@ export default function SettingsScreen() {
 
       <Card>
         <Row style={{ justifyContent: "space-between" }}>
-          <Text style={{ color: colors.text, fontSize: 16, fontWeight: "600" }}>Biometric lock</Text>
-          <Switch
-            value={settings.biometricLock}
-            onValueChange={toggleBiometric}
-            trackColor={{ true: colors.primaryDim, false: colors.border }}
-            thumbColor={settings.biometricLock ? colors.primary : colors.textMuted}
-          />
+          <Text variant="titleMedium">Biometric lock</Text>
+          <Switch value={settings.biometricLock} onValueChange={toggleBiometric} />
         </Row>
         <Muted>Require fingerprint / face unlock when the app opens.</Muted>
         {settings.biometricLock && (
           <>
-            <Text style={{ color: colors.textMuted, marginTop: spacing.md, marginBottom: 6, fontSize: 12 }}>
+            <Text
+              variant="labelMedium"
+              style={{ color: theme.colors.onSurfaceVariant, marginTop: spacing.md, marginBottom: 6 }}
+            >
               LOCK AFTER LEAVING THE APP FOR
             </Text>
             <Row style={{ flexWrap: "wrap" }}>
-              {GRACE.map((opt) => {
-                const active = settings.lockGraceMinutes === opt.minutes;
-                return (
-                  <Pressable
-                    key={opt.minutes}
-                    onPress={() => update({ lockGraceMinutes: opt.minutes })}
-                    style={{
-                      backgroundColor: active ? colors.primary : colors.surfaceHigh,
-                      borderRadius: radius.sm,
-                      paddingHorizontal: 12,
-                      paddingVertical: 6,
-                      marginBottom: 6,
-                    }}
-                  >
-                    <Text style={{ color: active ? "#06231a" : colors.text, fontWeight: "600", fontSize: 13 }}>
-                      {opt.label}
-                    </Text>
-                  </Pressable>
-                );
-              })}
+              {GRACE.map((opt) => (
+                <Chip
+                  key={opt.minutes}
+                  compact
+                  showSelectedCheck={false}
+                  selected={settings.lockGraceMinutes === opt.minutes}
+                  onPress={() => update({ lockGraceMinutes: opt.minutes })}
+                  style={{ marginBottom: 6 }}
+                >
+                  {opt.label}
+                </Chip>
+              ))}
             </Row>
           </>
         )}

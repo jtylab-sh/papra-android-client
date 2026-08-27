@@ -4,14 +4,16 @@ import { useShareIntent } from "expo-share-intent";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Alert, AppState } from "react-native";
+import { PaperProvider } from "react-native-paper";
 import { Button, Muted, Screen, Title } from "../components/ui";
-import { colors } from "../constants/theme";
+import { useAppTheme } from "../constants/theme";
 import { getAuthClient } from "../lib/auth";
 import { clearSettings, getSettings } from "../lib/settings";
 // Side effect: defines the background sync task at module scope.
 import { applySyncRegistration, wipeLocalData } from "../lib/sync";
 
 export default function RootLayout() {
+  const appTheme = useAppTheme();
   // null = still deciding, true = locked, false = usable
   const [locked, setLocked] = useState<boolean | null>(null);
   const leftAt = useRef<number | null>(null);
@@ -87,33 +89,31 @@ export default function RootLayout() {
     }
   }, [hasShareIntent, shareIntent, resetShareIntent]);
 
-  if (locked !== false) {
-    return (
-      <Screen style={{ justifyContent: "center", gap: 12 }}>
-        <StatusBar style="light" />
-        <Title>Papra</Title>
-        <Muted>Locked</Muted>
-        {locked === true && (
-          <>
-            <Button label="Unlock" onPress={unlock} />
-            <Button label="Sign out" kind="ghost" onPress={signOut} />
-          </>
-        )}
-      </Screen>
-    );
-  }
-
+  // One provider around both branches: the lock screen is Paper-themed too.
   return (
-    <>
+    <PaperProvider theme={appTheme}>
       <StatusBar style="light" />
-      <Stack
-        screenOptions={{
-          headerStyle: { backgroundColor: colors.surface },
-          headerTintColor: colors.text,
-          headerTitleStyle: { color: colors.text },
-          contentStyle: { backgroundColor: colors.bg },
-        }}
-      />
-    </>
+      {locked !== false ? (
+        <Screen style={{ justifyContent: "center", gap: 12 }}>
+          <Title>Papra</Title>
+          <Muted>Locked</Muted>
+          {locked === true && (
+            <>
+              <Button label="Unlock" onPress={unlock} />
+              <Button label="Sign out" kind="ghost" onPress={signOut} />
+            </>
+          )}
+        </Screen>
+      ) : (
+        <Stack
+          screenOptions={{
+            headerStyle: { backgroundColor: appTheme.colors.surface },
+            headerTintColor: appTheme.colors.onSurface,
+            headerTitleStyle: { color: appTheme.colors.onSurface },
+            contentStyle: { backgroundColor: appTheme.colors.background },
+          }}
+        />
+      )}
+    </PaperProvider>
   );
 }

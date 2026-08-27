@@ -3,14 +3,16 @@ import * as IntentLauncher from "expo-intent-launcher";
 import * as Sharing from "expo-sharing";
 import { Stack, router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import { Alert, ScrollView, Text, View } from "react-native";
+import { Alert, ScrollView, View } from "react-native";
+import { Text, useTheme } from "react-native-paper";
 import { Button, Card, KeyValue, Muted, TagChip, formatBytes, formatDate } from "../../components/ui";
-import { colors, spacing } from "../../constants/theme";
+import { spacing, type AppTheme } from "../../constants/theme";
 import { getCachedDocument, upsertDocuments, type CachedDocument } from "../../lib/db";
 import { getDocument, trashDocument, type PapraDocument } from "../../lib/papra";
 import { localFileNamedForUser } from "../../lib/sync";
 
 export default function DocumentScreen() {
+  const theme = useTheme<AppTheme>();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [cached, setCached] = useState<CachedDocument | null>(null);
   const [live, setLive] = useState<PapraDocument | null>(null);
@@ -82,7 +84,7 @@ export default function DocumentScreen() {
 
   if (!cached && !live) {
     return (
-      <View style={{ flex: 1, backgroundColor: colors.bg, padding: spacing.md }}>
+      <View style={{ flex: 1, backgroundColor: theme.colors.background, padding: spacing.md }}>
         <Stack.Screen options={{ title: "Document" }} />
         <Muted>Loading…</Muted>
       </View>
@@ -95,7 +97,10 @@ export default function DocumentScreen() {
   const customProperties = (live as unknown as { customProperties?: unknown })?.customProperties;
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: colors.bg }} contentContainerStyle={{ padding: spacing.md, gap: spacing.md }}>
+    <ScrollView
+      style={{ flex: 1, backgroundColor: theme.colors.background }}
+      contentContainerStyle={{ padding: spacing.md, gap: spacing.md }}
+    >
       <Stack.Screen options={{ title: doc.name ?? "Document" }} />
       <Card>
         <KeyValue label="Name" value={doc.name ?? ""} />
@@ -134,7 +139,7 @@ export default function DocumentScreen() {
       {Boolean(live?.content) && (
         <Card>
           <Muted>Extracted content</Muted>
-          <Text style={{ color: colors.text, marginTop: 8, fontSize: 13, lineHeight: 19 }} selectable>
+          <Text variant="bodySmall" style={{ marginTop: 8, lineHeight: 19 }} selectable>
             {live!.content}
           </Text>
         </Card>
