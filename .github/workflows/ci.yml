@@ -150,17 +150,29 @@ jobs:
         run: |
           set -o pipefail
           cd android && ./gradlew --no-daemon --build-cache --parallel --stacktrace assembleRelease 2>&1 | tee /tmp/gradle.log
-      # Job logs are admin-only via the API; the step summary is on the public
-      # run page — put the failure there so it can be diagnosed remotely.
+      # Job logs are admin-only via the API. Publish the failure excerpt as a
+      # commit comment (public, readable via the REST API) and in the step summary.
       - name: Surface gradle failure
         if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          excerpt=$(grep -B 2 -A 60 "What went wrong" /tmp/gradle.log | head -160)
+          [ -n "$excerpt" ] || excerpt=$(tail -160 /tmp/gradle.log)
           {
             echo '## Gradle failure'
             echo '```'
-            grep -B 2 -A 40 "What went wrong" /tmp/gradle.log | head -120 || tail -120 /tmp/gradle.log
+            printf '%s\n' "$excerpt"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+          jq -n --arg body "CI gradle failure (run ${GITHUB_RUN_NUMBER}):
+          \`\`\`
+          $excerpt
+          \`\`\`" '{body: $body}' | curl -sS -X POST \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/comments" \
+            -d @- -o /dev/null -w "commit comment: %{http_code}\n"
       - name: Create release with APK
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
