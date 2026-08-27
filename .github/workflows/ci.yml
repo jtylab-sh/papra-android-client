@@ -108,6 +108,16 @@ jobs:
           mv app.json.tmp app.json
       - name: Generate android project
         run: npx expo prebuild --platform android --no-install
+      # arm64-only cuts the native (C++) build to a quarter and the APK from
+      # ~107 MB to ~40 MB — every phone since ~2016 is arm64. Gradle build
+      # cache + parallel reuse compiled work across runs (setup-gradle
+      # persists ~/.gradle/caches between runs).
+      - name: Speed up native build
+        run: |
+          printf '%s\n' \
+            'reactNativeArchitectures=arm64-v8a' \
+            'org.gradle.parallel=true' \
+            'org.gradle.caching=true' >> android/gradle.properties
       - name: Decode keystore
         env:
           KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
@@ -137,7 +147,7 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-        run: cd android && ./gradlew --no-daemon assembleRelease
+        run: cd android && ./gradlew --no-daemon --build-cache --parallel assembleRelease
       - name: Create release with APK
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

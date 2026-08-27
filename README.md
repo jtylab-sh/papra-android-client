@@ -53,6 +53,7 @@ project.
 
 Grab the APK from the [latest release](../../releases/latest), or add this repo to
 [Obtainium](https://github.com/ImranR98/Obtainium) (`Add App` → paste the repo URL) to get updates.
+The APK is built for **arm64 (64-bit)** devices — any Android phone from roughly 2016 on.
 
 ## Server requirements
 
