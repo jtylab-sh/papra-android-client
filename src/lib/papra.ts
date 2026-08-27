@@ -5,11 +5,26 @@ import * as FileSystemLegacy from "expo-file-system/legacy";
  * Auth is the better-auth session cookie.
  */
 import * as Network from "expo-network";
+import { router } from "expo-router";
 import { AppState, ToastAndroid } from "react-native";
 import { getAuthCookie } from "~/lib/auth";
 import { getSettings, type Settings } from "~/lib/settings";
 
 let lastOfflineToastAt = 0;
+let lastAuthRedirect = 0;
+
+/** The stored session no longer works: tell the user once and route to sign-in. */
+function onSessionExpired(): void {
+  if (AppState.currentState !== "active") return;
+  if (Date.now() - lastAuthRedirect < 60_000) return;
+  lastAuthRedirect = Date.now();
+  try {
+    ToastAndroid.show("Session expired - sign in again", ToastAndroid.LONG);
+  } catch {
+    /* toast is best effort */
+  }
+  router.replace("/sign-in");
+}
 
 /**
  * The one offline notifier for every network-needing user action: when the
@@ -144,6 +159,7 @@ export async function papraRequest<T = unknown>(path: string, opts: RequestOptio
     clearTimeout(timer);
   }
   if (!res.ok) {
+    if (res.status === 401) onSessionExpired();
     let message = `${res.status} ${res.statusText}`;
     try {
       const json = (await res.json()) as { error?: { message?: string }; message?: string };
@@ -447,25 +463,48 @@ export async function removeTagFromDocument(documentId: string, tagId: string): 
 /** Upload a local file. RN FormData takes {uri, name, type}. */
 export async function uploadDocument(file: { uri: string; name: string; mimeType?: string }): Promise<PapraDocument> {
   const s = await getSettings();
-  if (file.uri.startsWith("file://")) {
-    // A stale picker/scan uri fails inside fetch dressed up as a network
-    // error — check first so the message tells the truth. 410 also keeps the
-    // offline queue from retrying a file that is gone.
-    const info = await FileSystemLegacy.getInfoAsync(file.uri).catch(() => null);
-    if (!info?.exists) throw new ApiError(410, "The file no longer exists on this phone");
+  if (!s.serverUrl) throw new ApiError(0, "No server configured");
+  // The global fetch is Expo's WinterCG one, which rejects React Native's
+  // { uri } FormData trick ("Unsupported FormDataPart implementation"), so
+  // uploads go through the native multipart uploader instead. It names the
+  // part after the file on disk, so stage a copy under the document name
+  // (this also turns content:// share-sheet uris into uploadable files).
+  const dir = `${FileSystemLegacy.cacheDirectory}upload-staging/`;
+  await FileSystemLegacy.makeDirectoryAsync(dir, { intermediates: true }).catch(() => {});
+  const staged = `${dir}${file.name.replace(/[\\/:*?"<>|]/g, "_") || "document"}`;
+  try {
+    await FileSystemLegacy.copyAsync({ from: file.uri, to: staged });
+  } catch {
+    // 410 keeps the offline queue from retrying a file that is gone.
+    throw new ApiError(410, "The file no longer exists on this phone");
   }
-  const form = new FormData();
-  form.append("file", {
-    uri: file.uri,
-    name: file.name,
-    type: file.mimeType ?? "application/octet-stream",
-  } as unknown as Blob);
-  const json = await papraRequest<{ document: PapraDocument }>(orgPath(s, "/documents"), {
-    method: "POST",
-    body: form,
-    settings: s,
-    timeoutMs: 180_000, // big scans on slow uplinks are legitimate
-  });
+  let res: FileSystemLegacy.FileSystemUploadResult;
+  try {
+    res = await FileSystemLegacy.uploadAsync(`${s.serverUrl}${orgPath(s, "/documents")}`, staged, {
+      httpMethod: "POST",
+      uploadType: FileSystemLegacy.FileSystemUploadType.MULTIPART,
+      fieldName: "file",
+      mimeType: file.mimeType ?? "application/octet-stream",
+      headers: await authHeaders(s),
+    });
+  } catch (cause) {
+    if (await notifyIfOffline()) throw new ApiError(0, "You are offline");
+    throw new ApiError(0, `Cannot reach ${s.serverUrl} (${cause instanceof Error ? cause.message : String(cause)})`);
+  } finally {
+    FileSystemLegacy.deleteAsync(staged, { idempotent: true }).catch(() => {});
+  }
+  if (res.status < 200 || res.status >= 300) {
+    if (res.status === 401) onSessionExpired();
+    let message = `${res.status}`;
+    try {
+      const json = JSON.parse(res.body) as { error?: { message?: string }; message?: string };
+      message = json.error?.message ?? json.message ?? message;
+    } catch {
+      /* non-JSON error body */
+    }
+    throw new ApiError(res.status, message);
+  }
+  const json = JSON.parse(res.body) as { document?: PapraDocument };
   return json.document ?? (json as unknown as PapraDocument);
 }
 

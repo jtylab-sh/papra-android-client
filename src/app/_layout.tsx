@@ -78,16 +78,26 @@ export default function RootLayout() {
     if (locked === true) unlock();
   }, [locked, unlock]);
 
+  // FLAG_SECURE rides the lock screen (and the background handler below), not
+  // the whole app: once unlocked, screenshots work normally again.
+  useEffect(() => {
+    if (locked === null) return;
+    (locked ? ScreenCapture.preventScreenCaptureAsync() : ScreenCapture.allowScreenCaptureAsync()).catch(() => {});
+  }, [locked]);
+
   useEffect(() => {
     let mounted = true;
     getSettings().then((s) => {
       if (!mounted) return;
       setLocked(s.biometricLock);
-      if (s.biometricLock) ScreenCapture.preventScreenCaptureAsync().catch(() => {});
     });
     const sub = AppState.addEventListener("change", (state) => {
       if (state === "background") {
         leftAt.current = Date.now();
+        // Blank the recents thumbnail while away; lifted on return or unlock.
+        getSettings().then((s) => {
+          if (s.biometricLock) ScreenCapture.preventScreenCaptureAsync().catch(() => {});
+        });
       } else if (state === "active") {
         flushUploads().catch(() => {});
         if (leftAt.current !== null) {
@@ -95,6 +105,7 @@ export default function RootLayout() {
           leftAt.current = null;
           getSettings().then((s) => {
             if (s.biometricLock && awayMs > s.lockGraceMinutes * 60_000) setLocked(true);
+            else ScreenCapture.allowScreenCaptureAsync().catch(() => {});
           });
         }
       }

@@ -58,9 +58,21 @@ export default function DrawerLayout() {
         <DrawerContentScrollView {...props} contentContainerStyle={{ flexGrow: 1 }}>
           <DrawerItemList {...props} />
           <DrawerItem
+            label="Upload"
+            icon={drawerIcon("tray-arrow-up")}
+            onPress={() => {
+              props.navigation.closeDrawer();
+              router.push("/upload");
+            }}
+            inactiveTintColor={theme.colors.onSurfaceVariant}
+          />
+          <DrawerItem
             label="Open in browser"
             icon={drawerIcon("open-in-new")}
-            onPress={openInBrowser}
+            onPress={() => {
+              props.navigation.closeDrawer();
+              openInBrowser();
+            }}
             inactiveTintColor={theme.colors.onSurfaceVariant}
           />
           <View style={{ flex: 1 }} />
