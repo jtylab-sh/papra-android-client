@@ -12,6 +12,15 @@ import {
 } from "../../lib/papra";
 import { syncMetadata } from "../../lib/sync";
 
+const RETENTION_DAYS = 30; // Papra server default (deletedDocumentsRetentionDays); not exposed via API
+
+function retentionSuffix(deletedAt: string | null | undefined) {
+  if (!deletedAt) return "";
+  const purgeAt = new Date(deletedAt).getTime() + RETENTION_DAYS * 24 * 60 * 60 * 1000;
+  const daysLeft = Math.ceil((purgeAt - Date.now()) / (24 * 60 * 60 * 1000));
+  return daysLeft <= 0 ? " · purge imminent" : ` · gone in ${daysLeft} day${daysLeft === 1 ? "" : "s"}`;
+}
+
 export default function TrashScreen() {
   const theme = useTheme<AppTheme>();
   const [docs, setDocs] = useState<PapraDocument[]>([]);
@@ -54,16 +63,24 @@ export default function TrashScreen() {
   );
 
   const confirmEmpty = () =>
-    Alert.alert("Empty trash?", "Every trashed document is deleted forever.", [
-      { text: "Cancel", style: "cancel" },
-      { text: "Empty trash", style: "destructive", onPress: () => act(emptyTrash) },
-    ]);
+    Alert.alert(
+      "Empty trash?",
+      `All ${docs.length} trashed document${docs.length === 1 ? "" : "s"} are deleted forever. Documents otherwise auto-delete after ${RETENTION_DAYS} days.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Empty trash", style: "destructive", onPress: () => act(emptyTrash) },
+      ],
+    );
 
   const confirmDeleteForever = (doc: PapraDocument) =>
-    Alert.alert("Delete forever?", doc.name, [
-      { text: "Cancel", style: "cancel" },
-      { text: "Delete", style: "destructive", onPress: () => act(() => deleteDocumentForever(doc.id)) },
-    ]);
+    Alert.alert(
+      "Delete forever?",
+      `${doc.name}\n\nThis is permanent and cannot be undone. Documents otherwise auto-delete after ${RETENTION_DAYS} days.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Delete", style: "destructive", onPress: () => act(() => deleteDocumentForever(doc.id)) },
+      ],
+    );
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
@@ -92,6 +109,7 @@ export default function TrashScreen() {
             </Text>
             <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant, marginVertical: 6 }}>
               deleted {formatDate(item.deletedAt ?? "")}
+              {retentionSuffix(item.deletedAt)}
             </Text>
             <Row>
               <View style={{ flex: 1 }}>

@@ -112,21 +112,25 @@ export default function DocumentScreen() {
     });
 
   const trash = () => {
-    Alert.alert("Move to trash?", cached?.name ?? "", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Trash",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            await trashDocument(id!);
-            router.back();
-          } catch (e) {
-            Alert.alert("Failed", e instanceof Error ? e.message : String(e));
-          }
+    Alert.alert(
+      "Move to trash?",
+      `${cached?.name ?? ""}\n\nIt stays in the trash for 30 days, then it is deleted permanently.`, // 30 = Papra server default (deletedDocumentsRetentionDays); not exposed via API
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Trash",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await trashDocument(id!);
+              router.back();
+            } catch (e) {
+              Alert.alert("Failed", e instanceof Error ? e.message : String(e));
+            }
+          },
         },
-      },
-    ]);
+      ],
+    );
   };
 
   if (!cached && !live) {
