@@ -651,6 +651,22 @@ export default function DocumentsScreen() {
         ListEmptyComponent={
           booting ? (
             <ActivityIndicator style={{ marginTop: spacing.lg }} />
+          ) : search.trim() || notSynced ? (
+            <View style={{ gap: spacing.md }}>
+              <Muted>0 results for this search.</Muted>
+              <PaperButton
+                mode="outlined"
+                icon="close"
+                onPress={() => {
+                  setNotSynced(false);
+                  setServerMode(false);
+                  setSearch("");
+                  loadLocal("", false);
+                }}
+              >
+                Clear search
+              </PaperButton>
+            </View>
           ) : (
           <View style={{ gap: spacing.md }}>
             <Muted>No documents yet. Pull to refresh, or add your first one.</Muted>

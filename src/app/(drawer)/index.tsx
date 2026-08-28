@@ -3,15 +3,15 @@
  * fallback offline) and the 20 most recent documents from the local mirror.
  */
 import { router, useFocusEffect } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { FlatList, InteractionManager, Pressable, RefreshControl, View } from "react-native";
-import { ActivityIndicator, Text, useTheme } from "react-native-paper";
+import { ActivityIndicator, IconButton, Modal, Portal, Searchbar, Text, useTheme } from "react-native-paper";
 import { DocumentRow } from "~/components/document-row";
 import { Button, Card, Muted, Row, formatBytes } from "~/components/ui";
 import { spacing, type AppTheme } from "~/constants/theme";
-import { countCachedDocuments, listCachedDocuments, type CachedDocument } from "~/lib/db";
+import { countCachedDocuments, getCachedDocument, listCachedDocuments, upsertDocuments, type CachedDocument } from "~/lib/db";
 import { useOnReconnect } from "~/lib/network";
-import { getDocumentsStatistics, type PapraOrgStats } from "~/lib/papra";
+import { getDocumentsStatistics, listDocuments, type PapraOrgStats } from "~/lib/papra";
 import { getSettings, isConnected } from "~/lib/settings";
 import { countOfflineOnDisk, syncMetadata } from "~/lib/sync";
 import { countQueuedUploads } from "~/lib/uploads";
@@ -24,6 +24,46 @@ export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [queued, setQueued] = useState(0);
   const [booting, setBooting] = useState(true);
+
+  // --- search modal: instant local hits, debounced server search on top ---
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [q, setQ] = useState("");
+  const [results, setResults] = useState<CachedDocument[]>([]);
+  const searchDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const onQueryChange = useCallback((t: string) => {
+    setQ(t);
+    setResults(t.trim() ? listCachedDocuments(t, 25, 0) : []);
+    if (searchDebounce.current) clearTimeout(searchDebounce.current);
+    if (!t.trim()) return;
+    searchDebounce.current = setTimeout(async () => {
+      try {
+        const { documents } = await listDocuments({
+          searchQuery: t.trim(),
+          pageIndex: 0,
+          pageSize: 25,
+          sortField: "createdAt",
+          sortOrder: "desc",
+        });
+        upsertDocuments(documents);
+        // Re-read through the cache so rows carry offline state.
+        const found = documents.map((d) => getCachedDocument(d.id)).filter((d): d is CachedDocument => d !== null);
+        setResults(found);
+      } catch {
+        /* offline - the instant local hits stay */
+      }
+    }, 350);
+  }, []);
+
+  useEffect(() => () => {
+    if (searchDebounce.current) clearTimeout(searchDebounce.current);
+  }, []);
+
+  const closeSearch = useCallback(() => {
+    setSearchOpen(false);
+    setQ("");
+    setResults([]);
+  }, []);
 
   const loadLocal = useCallback(() => {
     setRecent(listCachedDocuments("", 20, 0));
@@ -97,6 +137,7 @@ export default function HomeScreen() {
   if (!ready) return <View style={{ flex: 1, backgroundColor: theme.colors.background }} />;
 
   return (
+    <>
     <FlatList
       style={{ flex: 1, backgroundColor: theme.colors.background }}
       contentContainerStyle={{ padding: spacing.md }}
@@ -105,6 +146,11 @@ export default function HomeScreen() {
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={theme.colors.primary} />}
       ListHeaderComponent={
         <View style={{ gap: spacing.md, marginBottom: spacing.md }}>
+          <Pressable onPress={() => setSearchOpen(true)}>
+            <View pointerEvents="none">
+              <Searchbar placeholder="Search documents" value="" />
+            </View>
+          </Pressable>
           <Row>
             <View style={{ flex: 1 }}>
               <Button label="Scan" onPress={startScan} />
@@ -139,6 +185,58 @@ export default function HomeScreen() {
       }
       renderItem={({ item }) => <DocumentRow doc={item} onPress={() => router.push(`/document/${item.id}`)} />}
     />
+    <Portal>
+      <Modal
+        visible={searchOpen}
+        onDismiss={closeSearch}
+        contentContainerStyle={{
+          backgroundColor: theme.colors.surface,
+          margin: spacing.md,
+          borderRadius: 16,
+          padding: spacing.md,
+          maxHeight: "85%",
+        }}
+      >
+        <Row style={{ marginBottom: spacing.sm }}>
+          <View style={{ flex: 1 }}>
+            <Searchbar
+              placeholder="Search documents"
+              value={q}
+              onChangeText={onQueryChange}
+              autoFocus
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+          </View>
+          <IconButton icon="close" accessibilityLabel="Close search" onPress={closeSearch} />
+        </Row>
+        <FlatList
+          data={results}
+          keyExtractor={(d) => d.id}
+          keyboardShouldPersistTaps="handled"
+          ListEmptyComponent={
+            q.trim() ? (
+              <View style={{ gap: spacing.sm, marginTop: spacing.sm }}>
+                <Muted>0 results for this search.</Muted>
+                <Button label="Clear search" kind="ghost" onPress={() => onQueryChange("")} />
+              </View>
+            ) : (
+              <Muted>Search names, content and tags. Papra's query grammar works here too.</Muted>
+            )
+          }
+          renderItem={({ item }) => (
+            <DocumentRow
+              doc={item}
+              onPress={() => {
+                closeSearch();
+                router.push(`/document/${item.id}`);
+              }}
+            />
+          )}
+        />
+      </Modal>
+    </Portal>
+    </>
   );
 }
 
