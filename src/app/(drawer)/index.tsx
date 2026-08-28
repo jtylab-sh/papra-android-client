@@ -30,15 +30,26 @@ export default function HomeScreen() {
   // --- search modal: instant local hits, debounced server search on top ---
   const [searchOpen, setSearchOpen] = useState(false);
   const [q, setQ] = useState("");
+  const [searching, setSearching] = useState(false);
   const [results, setResults] = useState<CachedDocument[]>([]);
   const searchDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Guards against a slow server response landing after a newer keystroke.
+  const searchRun = useRef(0);
 
   const onQueryChange = useCallback((t: string) => {
     setQ(t);
-    setResults(t.trim() ? listCachedDocuments(t, 25, 0) : []);
+    const run = ++searchRun.current;
     if (searchDebounce.current) clearTimeout(searchDebounce.current);
-    if (!t.trim()) return;
+    if (!t.trim()) {
+      setSearching(false);
+      setResults([]);
+      return;
+    }
+    // Nothing runs until 350ms after the last keystroke; the loader shows
+    // from the keystroke until the search settles.
+    setSearching(true);
     searchDebounce.current = setTimeout(async () => {
+      setResults(listCachedDocuments(t, 25, 0)); // instant local hits first
       try {
         const { documents } = await listDocuments({
           searchQuery: t.trim(),
@@ -47,12 +58,15 @@ export default function HomeScreen() {
           sortField: "createdAt",
           sortOrder: "desc",
         });
+        if (run !== searchRun.current) return;
         upsertDocuments(documents);
         // Re-read through the cache so rows carry offline state.
         const found = documents.map((d) => getCachedDocument(d.id)).filter((d): d is CachedDocument => d !== null);
         setResults(found);
       } catch {
-        /* offline - the instant local hits stay */
+        /* offline - the local hits stay */
+      } finally {
+        if (run === searchRun.current) setSearching(false);
       }
     }, 350);
   }, []);
@@ -62,8 +76,11 @@ export default function HomeScreen() {
   }, []);
 
   const closeSearch = useCallback(() => {
+    searchRun.current++;
+    if (searchDebounce.current) clearTimeout(searchDebounce.current);
     setSearchOpen(false);
     setQ("");
+    setSearching(false);
     setResults([]);
   }, []);
 
@@ -214,12 +231,13 @@ export default function HomeScreen() {
           </View>
           <IconButton icon="close" accessibilityLabel="Close search" onPress={closeSearch} />
         </Row>
+        {searching ? <ActivityIndicator size="small" style={{ marginVertical: spacing.sm }} /> : null}
         <FlatList
           data={results}
           keyExtractor={(d) => d.id}
           keyboardShouldPersistTaps="handled"
           ListEmptyComponent={
-            q.trim() ? (
+            searching ? null : q.trim() ? (
               <View style={{ gap: spacing.sm, marginTop: spacing.sm }}>
                 <Muted>0 results for this search.</Muted>
                 <Button label="Clear search" kind="ghost" onPress={() => onQueryChange("")} />
