@@ -134,17 +134,17 @@ export default function UploadScreen() {
     // Every file goes through the on-disk queue first: the upload survives
     // app switches and kills (foreground flushes and the background task
     // drain the queue), and one notification shows batch progress.
-    let staged = files;
-    for (let i = 0; i < staged.length; i++) {
-      const f = staged[i];
-      if (f.status === "done" || f.key) continue;
+    const staged: PendingFile[] = [];
+    for (const f of files) {
+      if (f.status === "done" || f.key) {
+        staged.push(f);
+        continue;
+      }
       try {
         const key = await enqueueUpload(f);
-        staged = staged.map((x, j) => (j === i ? { ...x, key, status: "uploading" as const, error: undefined } : x));
+        staged.push({ ...f, key, status: "uploading", error: undefined });
       } catch (e) {
-        staged = staged.map((x, j) =>
-          j === i ? { ...x, status: "failed" as const, error: e instanceof Error ? e.message : String(e) } : x,
-        );
+        staged.push({ ...f, status: "failed", error: e instanceof Error ? e.message : String(e) });
       }
     }
     setFiles(staged);

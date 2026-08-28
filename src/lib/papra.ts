@@ -100,6 +100,16 @@ export class ApiError extends Error {
   }
 }
 
+/** Papra error bodies are {error:{message}} or {message}; else the fallback. */
+function errorMessage(body: string, fallback: string): string {
+  try {
+    const json = JSON.parse(body) as { error?: { message?: string }; message?: string };
+    return json.error?.message ?? json.message ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 /**
  * True only for the "device reports no connectivity" failure. That is the one
  * case where parking an upload in the queue is right; every other status-0
@@ -160,14 +170,8 @@ export async function papraRequest<T = unknown>(path: string, opts: RequestOptio
   }
   if (!res.ok) {
     if (res.status === 401) onSessionExpired();
-    let message = `${res.status} ${res.statusText}`;
-    try {
-      const json = (await res.json()) as { error?: { message?: string }; message?: string };
-      message = json.error?.message ?? json.message ?? message;
-    } catch {
-      /* non-JSON error body */
-    }
-    throw new ApiError(res.status, message);
+    const body = await res.text().catch(() => "");
+    throw new ApiError(res.status, errorMessage(body, `${res.status} ${res.statusText}`));
   }
   if (res.status === 204) return undefined as T;
   const text = await res.text();
@@ -495,14 +499,7 @@ export async function uploadDocument(file: { uri: string; name: string; mimeType
   }
   if (res.status < 200 || res.status >= 300) {
     if (res.status === 401) onSessionExpired();
-    let message = `${res.status}`;
-    try {
-      const json = JSON.parse(res.body) as { error?: { message?: string }; message?: string };
-      message = json.error?.message ?? json.message ?? message;
-    } catch {
-      /* non-JSON error body */
-    }
-    throw new ApiError(res.status, message);
+    throw new ApiError(res.status, errorMessage(res.body, `${res.status}`));
   }
   const json = JSON.parse(res.body) as { document?: PapraDocument };
   return json.document ?? (json as unknown as PapraDocument);

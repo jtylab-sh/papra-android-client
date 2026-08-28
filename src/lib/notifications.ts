@@ -128,15 +128,21 @@ export function wireNotificationNavigation(navigate: (url: string) => void): () 
  * service is what ends it.
  */
 const SYNC_PROGRESS_ID = "sync-progress";
-const FGS_ANDROID = {
-  channelId: SYNC_PROGRESS_ID,
-  asForegroundService: true,
-  foregroundServiceTypes: [AndroidForegroundServiceType.FOREGROUND_SERVICE_TYPE_DATA_SYNC],
-  ongoing: true,
-  onlyAlertOnce: true,
-  // Tap opens the app; wireNotificationNavigation routes it to Settings.
-  pressAction: { id: SYNC_PROGRESS_ID, launchActivity: "default" },
-};
+
+/** Shared shape of the ongoing progress notifications (sync and upload). */
+function fgsAndroid(channelId: string) {
+  return {
+    channelId,
+    asForegroundService: true,
+    foregroundServiceTypes: [AndroidForegroundServiceType.FOREGROUND_SERVICE_TYPE_DATA_SYNC],
+    ongoing: true,
+    onlyAlertOnce: true,
+    // Tap opens the app; wireNotificationNavigation routes by pressAction id.
+    pressAction: { id: channelId, launchActivity: "default" },
+  };
+}
+
+const FGS_ANDROID = fgsAndroid(SYNC_PROGRESS_ID);
 let lastProgressAt = 0;
 
 export async function startSyncService(): Promise<void> {
@@ -186,14 +192,7 @@ export async function stopSyncService(): Promise<void> {
  * running when the user switches apps. Taps lead to the queue page.
  */
 const UPLOAD_PROGRESS_ID = "upload-progress";
-const UPLOAD_FGS_ANDROID = {
-  channelId: UPLOAD_PROGRESS_ID,
-  asForegroundService: true,
-  foregroundServiceTypes: [AndroidForegroundServiceType.FOREGROUND_SERVICE_TYPE_DATA_SYNC],
-  ongoing: true,
-  onlyAlertOnce: true,
-  pressAction: { id: UPLOAD_PROGRESS_ID, launchActivity: "default" },
-};
+const UPLOAD_FGS_ANDROID = fgsAndroid(UPLOAD_PROGRESS_ID);
 
 /** asService=false for background runs (Android 12+ forbids starting one there). */
 export async function updateUploadProgress(done: number, total: number, name: string, asService = true): Promise<void> {
