@@ -5,6 +5,7 @@
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { FlatList, InteractionManager, Pressable, RefreshControl, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ActivityIndicator, IconButton, Modal, Portal, Searchbar, Text, useTheme } from "react-native-paper";
 import { DocumentRow } from "~/components/document-row";
 import { Button, Card, Muted, Row, formatBytes } from "~/components/ui";
@@ -18,6 +19,7 @@ import { countQueuedUploads } from "~/lib/uploads";
 
 export default function HomeScreen() {
   const theme = useTheme<AppTheme>();
+  const insets = useSafeAreaInsets();
   const [ready, setReady] = useState(false);
   const [recent, setRecent] = useState<CachedDocument[]>([]);
   const [stats, setStats] = useState<PapraOrgStats | null>(null);
@@ -189,12 +191,14 @@ export default function HomeScreen() {
       <Modal
         visible={searchOpen}
         onDismiss={closeSearch}
+        // Full screen: the centered sheet resized with every keystroke and
+        // keyboard bounce; a fixed surface has no layout shift.
+        style={{ margin: 0, justifyContent: "flex-start" }}
         contentContainerStyle={{
-          backgroundColor: theme.colors.surface,
-          margin: spacing.md,
-          borderRadius: 16,
+          backgroundColor: theme.colors.background,
+          flex: 1,
           padding: spacing.md,
-          maxHeight: "85%",
+          paddingTop: insets.top + spacing.sm,
         }}
       >
         <Row style={{ marginBottom: spacing.sm }}>
