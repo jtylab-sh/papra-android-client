@@ -121,63 +121,103 @@ function displayFileName(cached: { name: string; mimeType: string }): string {
 }
 
 /**
- * Best-effort export of one offline blob into the user-chosen SAF folder
- * (Settings -> "Export copies to folder"). The private mirror stays the
- * source of truth; export failures never fail a sync.
- * ponytail: base64 round-trip through the legacy FS API — the only way to
- * write SAF content:// URIs; fine for scanned documents, slow for huge files.
- */
-/**
  * Keep the export folder out of the phone's gallery: a `.nomedia` file makes
  * Android's media scanner skip the directory. Written once per folder.
  */
-export async function ensureNoMedia(exportDirUri: string): Promise<void> {
+export async function ensureNoMedia(exportDirUri: string, existing?: Map<string, string> | null): Promise<void> {
   if (!exportDirUri) return;
   const key = `nomedia:${exportDirUri}`;
   if (getMeta(key)) return;
-  try {
-    await FileSystemLegacy.StorageAccessFramework.createFileAsync(
-      exportDirUri,
-      ".nomedia",
-      "application/octet-stream",
+  // The marker outlives a DB wipe (sign-out); SAF would answer a second
+  // create with " (1).nomedia", so look at the folder first.
+  const files = existing === undefined ? await listExportFiles(exportDirUri) : existing;
+  if (!files) return; // unreadable - retried next sync
+  if (!new Set(files.values()).has(".nomedia")) {
+    await FileSystemLegacy.StorageAccessFramework.createFileAsync(exportDirUri, ".nomedia", "application/octet-stream").catch(
+      () => {},
     );
-  } catch {
-    /* exists already */
   }
   setMeta(key, "1");
 }
 
-/** Names currently present in the export folder, or null when unreadable. */
-async function listExportNames(exportDirUri: string): Promise<Set<string> | null> {
+/** Export folder contents as uri -> file name, or null when unreadable. */
+async function listExportFiles(exportDirUri: string): Promise<Map<string, string> | null> {
   try {
     const entries = await FileSystemLegacy.StorageAccessFramework.readDirectoryAsync(exportDirUri);
-    return new Set(entries.map((uri) => decodeURIComponent(uri.split("%2F").pop() ?? "")));
+    return new Map(entries.map((uri) => [uri, decodeURIComponent(uri.split("%2F").pop() ?? "")]));
   } catch {
-    return null; // folder revoked/offline — don't force re-exports on bad info
+    return null; // folder revoked/offline - don't force re-exports on bad info
   }
 }
 
-async function exportCopy(id: string, exportDirUri: string, existingNames: Set<string> | null): Promise<void> {
+/** "name (2).pdf" -> "name.pdf": the suffix SAF adds when a name is taken. */
+const unsuffixed = (name: string) => name.replace(/ \(\d+\)(?=\.[^.]*$|$)/, "");
+
+async function sizeOf(uri: string): Promise<number | null> {
+  const info = await FileSystemLegacy.getInfoAsync(uri).catch(() => null);
+  return info?.exists ? info.size : null;
+}
+
+/**
+ * Best-effort export of one offline blob into the user-chosen SAF folder
+ * (Settings -> "Export copies to folder"). The private mirror stays the
+ * source of truth; export failures never fail a sync.
+ * SAF never overwrites - creating a taken name yields "name (1)" - so the
+ * `exported:<id>` row remembers the file we made, and a copy already in the
+ * folder (DB wiped by sign-out, interrupted write) is adopted by size instead
+ * of being created again. A manually deleted copy comes back on the next sync.
+ * ponytail: base64 round-trip through the legacy FS API - the only way to
+ * write SAF content:// URIs; fine for scanned documents, slow for huge files.
+ */
+async function exportCopy(id: string, exportDirUri: string, existing: Map<string, string> | null): Promise<void> {
   if (!exportDirUri) return;
   const cached = getCachedDocument(id);
   if (!cached?.fileUri) return;
   const metaKey = `exported:${id}`;
-  // Skip only when the exported copy is verifiably still there — a manually
-  // deleted file gets re-exported on the next sync.
-  if (getMeta(metaKey) === exportDirUri && (!existingNames || existingNames.has(displayFileName(cached)))) return;
+  const name = displayFileName(cached);
+  const exported = getMeta(metaKey);
+  if (exported && !existing) return; // can't verify: trust the marker
   try {
-    const data = await FileSystemLegacy.readAsStringAsync(cached.fileUri, {
-      encoding: FileSystemLegacy.EncodingType.Base64,
-    });
-    const target = await FileSystemLegacy.StorageAccessFramework.createFileAsync(
-      exportDirUri,
-      displayFileName(cached),
-      cached.mimeType || "application/octet-stream",
-    );
-    await FileSystemLegacy.writeAsStringAsync(target, data, { encoding: FileSystemLegacy.EncodingType.Base64 });
-    setMeta(metaKey, exportDirUri);
+    let stale: string | null = null;
+    if (exported && existing?.has(exported)) {
+      // Still there. A rename on the server replaces the copy; SAF's " (n)"
+      // from a name clash is not a rename.
+      if (unsuffixed(existing.get(exported)!) === name) return;
+      stale = exported;
+    }
+    // Adopt a same-named copy of the same size (exact name first); further
+    // size matches are duplicates of it and go.
+    const size = await sizeOf(cached.fileUri);
+    const candidates = [...(existing ?? [])]
+      .filter(([, n]) => unsuffixed(n) === name)
+      .sort(([, a], [, b]) => Number(a !== name) - Number(b !== name));
+    let target: string | null = null;
+    for (const [uri] of candidates) {
+      if (size === null || (await sizeOf(uri)) !== size) continue;
+      if (target) {
+        await FileSystemLegacy.deleteAsync(uri, { idempotent: true }).catch(() => {});
+        existing?.delete(uri);
+      } else target = uri;
+    }
+    if (!target) {
+      const data = await FileSystemLegacy.readAsStringAsync(cached.fileUri, {
+        encoding: FileSystemLegacy.EncodingType.Base64,
+      });
+      target = await FileSystemLegacy.StorageAccessFramework.createFileAsync(
+        exportDirUri,
+        name,
+        cached.mimeType || "application/octet-stream",
+      );
+      await FileSystemLegacy.writeAsStringAsync(target, data, { encoding: FileSystemLegacy.EncodingType.Base64 });
+      existing?.set(target, name);
+    }
+    setMeta(metaKey, target);
+    if (stale && stale !== target) {
+      await FileSystemLegacy.deleteAsync(stale, { idempotent: true }).catch(() => {});
+      existing?.delete(stale);
+    }
   } catch {
-    /* folder revoked/full — retried next sync */
+    /* folder revoked/full - retried next sync */
   }
 }
 
@@ -296,7 +336,23 @@ export interface SyncResult {
   lastError?: string;
 }
 
-export async function syncNow(
+let inFlight: Promise<SyncResult> | null = null;
+
+/**
+ * One sync at a time: the background task and "Sync now" overlapping would
+ * export the same new documents twice. A caller joining a running sync gets
+ * its result (its own onProgress is not wired).
+ */
+export function syncNow(opts: Parameters<typeof runSync>[0] = {}): Promise<SyncResult> {
+  if (!inFlight) {
+    inFlight = runSync(opts).finally(() => {
+      inFlight = null;
+    });
+  }
+  return inFlight;
+}
+
+async function runSync(
   opts: {
     respectWifiOnly?: boolean;
     onProgress?: (done: number, total: number) => void;
@@ -332,8 +388,8 @@ export async function syncNow(
   // Foreground service + progress notification: keeps a manual sync running
   // when the user leaves the app. Never from background tasks — Android 12+
   // forbids starting a foreground service from the background.
-  const exportNames = s.offlineExportDirUri ? await listExportNames(s.offlineExportDirUri) : null;
-  if (s.offlineExportDirUri) await ensureNoMedia(s.offlineExportDirUri).catch(() => {});
+  const exportFiles = s.offlineExportDirUri ? await listExportFiles(s.offlineExportDirUri) : null;
+  if (s.offlineExportDirUri) await ensureNoMedia(s.offlineExportDirUri, exportFiles).catch(() => {});
   const useService = !opts.background && s.notifySyncProgress;
   const plainProgress = Boolean(opts.background) && s.notifySyncProgress;
   if (useService) await startSyncService().catch(() => {});
@@ -366,7 +422,7 @@ export async function syncNow(
             lastError = e instanceof Error ? e.message : String(e);
           }
         }
-        await exportCopy(id, s.offlineExportDirUri, exportNames);
+        await exportCopy(id, s.offlineExportDirUri, exportFiles);
         opts.onProgress?.(++done, total);
         if (useService || plainProgress) updateSyncProgress(done, total, useService).catch(() => {});
       }
@@ -440,8 +496,9 @@ export async function applySyncRegistration(): Promise<void> {
 /**
  * Delete every offline copy (blobs + pointers + exported folder copies) but
  * keep the metadata mirror. Offered when the user turns offline sync off.
- * Only files matching our documents' export names are removed from the
- * user-picked folder — anything else in there is untouched.
+ * Only files carrying our documents' export names (SAF " (n)" copies
+ * included) are removed from the user-picked folder - anything else in
+ * there is untouched.
  */
 export async function wipeOfflineFiles(exportDirUri: string): Promise<void> {
   if (exportDirUri) {
@@ -454,7 +511,7 @@ export async function wipeOfflineFiles(exportDirUri: string): Promise<void> {
       const entries = await FileSystemLegacy.StorageAccessFramework.readDirectoryAsync(exportDirUri);
       for (const uri of entries) {
         const name = decodeURIComponent(uri.split("%2F").pop() ?? "");
-        if (expected.has(name)) {
+        if (expected.has(unsuffixed(name))) {
           await FileSystemLegacy.deleteAsync(uri, { idempotent: true }).catch(() => {});
         }
       }
