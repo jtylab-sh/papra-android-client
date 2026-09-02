@@ -81,8 +81,10 @@ Grab the APK from the [latest release](../../releases/latest), or add the repo t
 
 ## Offline sync notes
 
-- The background job runs through Android's WorkManager: the cadence is a minimum, Android picks
-  the exact moment and by default waits for network and a non-low battery.
+- The background job runs through Android's WorkManager: the cadence is a minimum. Android picks
+  the exact moment, waits for a network connection, and defers jobs while the phone sleeps (Doze),
+  so a 15-minute cadence can take longer on an idle phone. A run stops itself after 7 minutes and
+  the next one continues where it left off.
 - Force-stopping the app suspends background jobs until the app is opened again. That is Android
   policy.
 

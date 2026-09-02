@@ -494,10 +494,13 @@ TaskManager.defineTask(SYNC_TASK, async () => {
 /** (Re-)register or unregister the background job to match settings. */
 export async function applySyncRegistration(): Promise<void> {
   const s = await getSettings();
+  // expo-task-manager only updates the options of a task that is already
+  // registered: the WorkManager chain keeps its old delay, and a chain broken
+  // by a killed run stays broken until the process restarts. Unregistering
+  // first makes every call reschedule from now with the current interval.
+  await BackgroundTask.unregisterTaskAsync(SYNC_TASK).catch(() => {});
   if (s.syncEnabled) {
     await BackgroundTask.registerTaskAsync(SYNC_TASK, { minimumInterval: s.syncIntervalMinutes });
-  } else {
-    await BackgroundTask.unregisterTaskAsync(SYNC_TASK).catch(() => {});
   }
 }
 

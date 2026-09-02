@@ -6,6 +6,7 @@
  * Static dark palette: widgets can't use the runtime MD3 theme.
  */
 import { FlexWidget, ListWidget, TextWidget, requestWidgetUpdate } from "react-native-android-widget";
+import { formatDateOnly } from "~/components/ui";
 import { listCachedDocuments, type CachedDocument } from "~/lib/db";
 
 const BG = "#131a18";
@@ -63,7 +64,7 @@ export function RecentDocumentsWidget({ docs }: { docs: CachedDocument[] }) {
             >
               <TextWidget text={doc.name} maxLines={1} style={{ fontSize: 13, color: TEXT }} />
               <TextWidget
-                text={`${doc.createdAt ? new Date(doc.createdAt).toLocaleDateString() : ""}${doc.fileUri ? "  ·  offline" : ""}`}
+                text={`${formatDateOnly(doc.createdAt)}${doc.fileUri ? "  ·  offline" : ""}`}
                 style={{ fontSize: 11, color: MUTED }}
               />
             </FlexWidget>

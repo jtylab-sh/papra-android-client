@@ -12,7 +12,7 @@ import {
   Text,
   useTheme,
 } from "react-native-paper";
-import { Button, Card, ChipRow, Input, KeyValue, Muted, Row } from "~/components/ui";
+import { Button, Card, ChipRow, Input, KeyValue, Muted, Row, formatDate } from "~/components/ui";
 import { spacing, type AppTheme } from "~/constants/theme";
 import { requestPinWidget } from "react-native-android-widget";
 import { getAuthClient } from "~/lib/auth";
@@ -366,7 +366,7 @@ export default function SettingsScreen() {
           <Muted>
             Offline: {countOfflineOnDisk()} of {countCachedDocuments()} documents on this phone
           </Muted>
-          {lastSyncAt ? <Muted>Last sync: {new Date(lastSyncAt).toLocaleString()}</Muted> : null}
+          {lastSyncAt ? <Muted>Last sync: {formatDate(lastSyncAt)}</Muted> : null}
         </View>
       </Card>
 

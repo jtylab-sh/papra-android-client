@@ -181,6 +181,12 @@ export function formatDate(iso: string, format: DateFormat = getActiveDateFormat
     : formatDay(d, format) + " " + d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
+/** Day only, for widgets and compact rows. */
+export function formatDateOnly(iso: string, format: DateFormat = getActiveDateFormat()): string {
+  const d = new Date(iso);
+  return !iso || isNaN(d.getTime()) ? iso : formatDay(d, format);
+}
+
 const styles = StyleSheet.create({
   screen: { flex: 1, padding: spacing.md },
   title: { marginBottom: spacing.md },
