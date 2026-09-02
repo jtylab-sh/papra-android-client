@@ -1,5 +1,4 @@
 import * as FileSystemLegacy from "expo-file-system/legacy";
-import { useFocusEffect } from "expo-router";
 import * as LocalAuthentication from "expo-local-authentication";
 import { useCallback, useEffect, useState } from "react";
 import { Alert, ScrollView, View } from "react-native";
@@ -19,10 +18,9 @@ import { getAuthClient } from "~/lib/auth";
 import { requestNotificationPermission } from "~/lib/notifications";
 import { createOrganization, getServerVersion, listOrganizations, type PapraOrganization } from "~/lib/papra";
 import { countCachedDocuments, getMeta } from "~/lib/db";
-import { countOfflineOnDisk, isSyncing } from "~/lib/sync";
+import { countOfflineOnDisk } from "~/lib/sync";
 import { getSettings, saveSettings, type Settings } from "~/lib/settings";
 import {
-  applySyncRegistration,
   ensureNoMedia,
   requestSyncPause,
   syncMetadata,
@@ -39,14 +37,6 @@ const GRACE = [
   { label: "1 h", value: 60 },
 ];
 
-const INTERVALS = [
-  { label: "15 min", value: 15 },
-  { label: "1 h", value: 60 },
-  { label: "6 h", value: 360 },
-  { label: "12 h", value: 720 },
-  { label: "24 h", value: 1440 },
-];
-
 const RETENTION = [7, 14, 30, 60, 90].map((days) => ({ label: `${days} days`, value: days }));
 
 const DATE_FORMATS: { label: string; value: Settings["dateFormat"] }[] = [
@@ -61,21 +51,6 @@ export default function SettingsScreen() {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [progress, setProgress] = useState<string>("");
   const [syncing, setSyncing] = useState(false);
-  // Drawer screens stay mounted: re-read "Last sync" and the counts when the
-  // page gains focus, and follow a background sync while one runs.
-  const [, rerender] = useState(0);
-  useFocusEffect(
-    useCallback(() => {
-      rerender((n) => n + 1);
-      let was = false;
-      const t = setInterval(() => {
-        const now = isSyncing();
-        if (now || was) rerender((n) => n + 1);
-        was = now;
-      }, 1000);
-      return () => clearInterval(t);
-    }, []),
-  );
   const [serverVersion, setServerVersion] = useState("");
   const lastSyncAt = getMeta("lastSyncAt");
 
@@ -101,10 +76,8 @@ export default function SettingsScreen() {
     });
   }, []);
 
-  const update = useCallback(async (patch: Partial<Settings>, reRegister = false) => {
-    const next = await saveSettings(patch);
-    setSettings(next);
-    if (reRegister) await applySyncRegistration();
+  const update = useCallback(async (patch: Partial<Settings>) => {
+    setSettings(await saveSettings(patch));
   }, []);
 
   const toggleBiometric = useCallback(
@@ -168,7 +141,7 @@ export default function SettingsScreen() {
 
   const toggleSync = useCallback(
     (v: boolean) => {
-      update({ syncEnabled: v }, true);
+      update({ syncEnabled: v });
       if (v) return;
       const n = countCachedDocuments("", true);
       if (n === 0) return;
@@ -197,15 +170,7 @@ export default function SettingsScreen() {
   );
 
   const toggleNotification = useCallback(
-    async (
-      key:
-        | "notifyNewDocuments"
-        | "notifySyncFailures"
-        | "notifySessionExpired"
-        | "notifyTrashPurge"
-        | "notifySyncProgress",
-      value: boolean,
-    ) => {
+    async (key: "notifySyncProgress", value: boolean) => {
       if (value && !(await requestNotificationPermission())) {
         Alert.alert("No permission", "Allow notifications for Papra in Android settings first.");
         return;
@@ -311,25 +276,10 @@ export default function SettingsScreen() {
           <Text variant="titleMedium">Offline sync</Text>
           <Switch value={settings.syncEnabled} onValueChange={toggleSync} />
         </Row>
-        <Muted>Mirrors every document to this phone in the background.</Muted>
+        <Muted>Keeps a copy of every document on this phone. Sync now updates it.</Muted>
 
         {settings.syncEnabled && (
           <>
-            <Text
-              variant="labelMedium"
-              style={{ color: theme.colors.onSurfaceVariant, marginTop: spacing.md, marginBottom: 6 }}
-            >
-              CADENCE (Android decides the exact moment)
-            </Text>
-            <ChipRow
-              options={INTERVALS}
-              value={settings.syncIntervalMinutes}
-              onSelect={(minutes) => update({ syncIntervalMinutes: minutes }, true)}
-            />
-            <Row style={{ justifyContent: "space-between", marginTop: spacing.sm }}>
-              <Text variant="bodyLarge">Wi-Fi only</Text>
-              <Switch value={settings.syncWifiOnly} onValueChange={(v: boolean) => update({ syncWifiOnly: v })} />
-            </Row>
             <Row style={{ justifyContent: "space-between", marginTop: spacing.sm }}>
               <View style={{ flex: 1 }}>
                 <Text variant="bodyLarge">Export copies to folder</Text>
@@ -362,7 +312,6 @@ export default function SettingsScreen() {
           <Button label="Sync now" kind="ghost" onPress={runSync} loading={syncing} />
           {syncing ? <Button label="Pause" kind="ghost" onPress={requestSyncPause} /> : null}
           {progress ? <Muted>{progress}</Muted> : null}
-          {!syncing && isSyncing() ? <Muted>Background sync running…</Muted> : null}
           <Muted>
             Offline: {countOfflineOnDisk()} of {countCachedDocuments()} documents on this phone
           </Muted>
@@ -410,17 +359,13 @@ export default function SettingsScreen() {
 
       <Card>
         <Text variant="titleMedium">Notifications</Text>
-        <Muted>All from background syncs only; permission is asked on first enable.</Muted>
+        <Muted>Permission is asked on first enable.</Muted>
         {(
           [
-            ["notifyNewDocuments", "New documents", "When a background sync finds documents new to this phone"],
-            ["notifySyncFailures", "Sync failures", "After 3 failed background syncs in a row"],
-            ["notifySessionExpired", "Session expired", "When the server wants you to sign in again"],
-            ["notifyTrashPurge", "Trash purge warning", "When trashed documents are within 3 days of permanent deletion"],
             [
               "notifySyncProgress",
               "Sync progress",
-              "Ongoing progress notification while any sync runs; manual syncs also keep running when you leave the app",
+              "Ongoing progress notification while a sync runs; the sync keeps running when you leave the app",
             ],
           ] as const
         ).map(([key, label, desc]) => (

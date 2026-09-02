@@ -1,17 +1,13 @@
 /**
  * Offline sync: mirror all document metadata into SQLite and download every
- * blob into the app's private storage. Runs on demand ("Sync now") and as an
- * expo-background-task (WorkManager) at the user-chosen cadence.
+ * blob into the app's private storage. Runs on demand ("Sync now") and keeps
+ * going in a foreground service when the user leaves the app.
  */
-import * as BackgroundTask from "expo-background-task";
 import { Directory, File, Paths } from "expo-file-system";
 import * as FileSystemLegacy from "expo-file-system/legacy";
 import * as Network from "expo-network";
 import * as SecureStore from "expo-secure-store";
-import * as TaskManager from "expo-task-manager";
 import {
-  ApiError,
-  listDeletedDocuments,
   listDocuments,
   documentFileUrl,
   notifyIfOffline,
@@ -32,19 +28,7 @@ import {
 import { authStorageKeys, getAuthClient } from "~/lib/auth";
 import { getSettings, isConnected, saveSettings, type Settings } from "~/lib/settings";
 import { updateRecentDocumentsWidget } from "~/widgets/widgets";
-import { flushUploads } from "~/lib/uploads";
-import {
-  clearSyncNotification,
-  notifyNewDocuments,
-  notifySessionExpired,
-  notifySyncFailures,
-  notifyTrashPurge,
-  startSyncService,
-  stopSyncService,
-  updateSyncProgress,
-} from "~/lib/notifications";
-
-export const SYNC_TASK = "papra-sync";
+import { startSyncService, stopSyncService, updateSyncProgress } from "~/lib/notifications";
 
 function docsDir(): Directory {
   const dir = new Directory(Paths.document, "docs");
@@ -244,7 +228,7 @@ export function requestSyncPause(): void {
   pauseRequested = true;
 }
 
-/** Thrown to unwind the download loop on user pause or background offline. */
+/** Thrown to unwind the download loop when the user pauses. */
 class SyncInterrupted extends Error {}
 
 async function isOffline(): Promise<boolean> {
@@ -260,12 +244,11 @@ async function waitForNetwork(): Promise<void> {
 }
 
 /**
- * Download with resilience. Offline mid-sync is a pause, not a failure:
- * foreground runs wait for connectivity and retry the same document;
- * background runs interrupt (WorkManager tries again later). Genuine online
+ * Download with resilience. Offline mid-sync is a pause, not a failure: the
+ * run waits for connectivity and retries the same document. Genuine online
  * failures get one retry after a second.
  */
-async function downloadWithRetry(id: string, background: boolean): Promise<void> {
+async function downloadWithRetry(id: string): Promise<void> {
   let failures = 0;
   for (;;) {
     if (pauseRequested) throw new SyncInterrupted("paused");
@@ -274,7 +257,6 @@ async function downloadWithRetry(id: string, background: boolean): Promise<void>
       return;
     } catch (e) {
       if (await isOffline()) {
-        if (background) throw new SyncInterrupted("offline");
         await waitForNetwork();
         continue;
       }
@@ -326,11 +308,11 @@ export function countOfflineOnDisk(): number {
 }
 
 export interface SyncResult {
-  skipped?: "not-configured" | "wifi";
+  skipped?: "not-configured";
   documents: number;
   downloaded: number;
   failed: number;
-  /** user paused, or a background run lost connectivity; the next run continues */
+  /** user paused; the next run continues where this one stopped */
   paused?: boolean;
   /** message of the last failed download — the only clue when many fail */
   lastError?: string;
@@ -341,8 +323,8 @@ let inFlight: Promise<SyncResult> | null = null;
 export const isSyncing = (): boolean => inFlight !== null;
 
 /**
- * One sync at a time: the background task and "Sync now" overlapping would
- * export the same new documents twice. A caller joining a running sync gets
+ * One sync at a time: two overlapping runs would export the same new
+ * documents twice. A caller joining a running sync gets
  * its result (its own onProgress is not wired).
  */
 export function syncNow(opts: Parameters<typeof runSync>[0] = {}): Promise<SyncResult> {
@@ -354,48 +336,22 @@ export function syncNow(opts: Parameters<typeof runSync>[0] = {}): Promise<SyncR
   return inFlight;
 }
 
-async function runSync(
-  opts: {
-    respectWifiOnly?: boolean;
-    onProgress?: (done: number, total: number) => void;
-    /** background runs may notify; foreground runs never do (user sees the UI) */
-    background?: boolean;
-    /** epoch ms: past it the run pauses itself and the next one continues */
-    deadline?: number;
-  } = {},
-): Promise<SyncResult> {
+async function runSync(opts: { onProgress?: (done: number, total: number) => void } = {}): Promise<SyncResult> {
   const s = await getSettings();
   pauseRequested = false;
   if (!isConnected(s)) return { skipped: "not-configured", documents: 0, downloaded: 0, failed: 0 };
-  if (opts.respectWifiOnly && s.syncWifiOnly) {
-    const state = await Network.getNetworkStateAsync();
-    if (state.type !== Network.NetworkStateType.WIFI) {
-      return { skipped: "wifi", documents: 0, downloaded: 0, failed: 0 };
-    }
-  }
-  const knownIds = opts.background ? new Set(listCachedDocuments().map((d) => d.id)) : null;
   const ids = await syncMetadata(s);
   countOfflineOnDisk(); // reconcile pointers with the files actually on disk
-  if (opts.background && knownIds && knownIds.size > 0) {
-    const fresh = ids.filter((docId) => !knownIds.has(docId));
-    if (fresh.length > 0) {
-      const first = getCachedDocument(fresh[0])?.name ?? "";
-      notifyNewDocuments(fresh.length, first).catch(() => {});
-    }
-  }
-  if (opts.background) await checkTrashPurge(s.trashRetentionDays).catch(() => {});
   let downloaded = 0;
   let failed = 0;
   let done = 0;
   let lastError = "";
   let paused = false;
-  // Foreground service + progress notification: keeps a manual sync running
-  // when the user leaves the app. Never from background tasks — Android 12+
-  // forbids starting a foreground service from the background.
+  // Foreground service + progress notification keep the sync running when the
+  // user leaves the app.
   const exportFiles = s.offlineExportDirUri ? await listExportFiles(s.offlineExportDirUri) : null;
   if (s.offlineExportDirUri) await ensureNoMedia(s.offlineExportDirUri, exportFiles).catch(() => {});
-  const useService = !opts.background && s.notifySyncProgress;
-  const plainProgress = Boolean(opts.background) && s.notifySyncProgress;
+  const useService = s.notifySyncProgress;
   if (useService) await startSyncService().catch(() => {});
   const processed = new Set<string>();
   let queue = ids;
@@ -406,7 +362,7 @@ async function runSync(
     // constant stream of uploads can't keep the loop alive forever).
     for (let round = 0; round < 3 && queue.length > 0 && !paused; round++) {
       for (const id of queue) {
-        if (pauseRequested || Date.now() > (opts.deadline ?? Infinity)) {
+        if (pauseRequested) {
           paused = true;
           break;
         }
@@ -415,7 +371,7 @@ async function runSync(
         const needsFile = !cached?.fileUri || !new File(cached.fileUri).exists;
         if (needsFile) {
           try {
-            await downloadWithRetry(id, Boolean(opts.background));
+            await downloadWithRetry(id);
             downloaded++;
           } catch (e) {
             if (e instanceof SyncInterrupted) {
@@ -428,7 +384,7 @@ async function runSync(
         }
         await exportCopy(id, s.offlineExportDirUri, exportFiles);
         opts.onProgress?.(++done, total);
-        if (useService || plainProgress) updateSyncProgress(done, total, useService).catch(() => {});
+        if (useService) updateSyncProgress(done, total).catch(() => {});
       }
       if (paused) break;
       const latest = await syncMetadata(s).catch(() => [] as string[]);
@@ -437,71 +393,9 @@ async function runSync(
     }
   } finally {
     if (useService) await stopSyncService().catch(() => {});
-    if (plainProgress) await clearSyncNotification();
   }
   setMeta("lastSyncAt", new Date().toISOString());
   return { documents: total, downloaded, failed, paused: paused || undefined, lastError: lastError || undefined };
-}
-
-/**
- * Warn (channel `alerts`, at most once a day) when trashed documents are close
- * to the server's permanent purge. Retention mirrors the Settings value.
- */
-const PURGE_WARN_DAYS = 3;
-
-async function checkTrashPurge(retentionDays: number): Promise<void> {
-  const today = new Date().toISOString().slice(0, 10);
-  if (getMeta("lastPurgeWarnDay") === today) return;
-  const { documents } = await listDeletedDocuments({ pageIndex: 0 });
-  const day = 24 * 60 * 60 * 1000;
-  const soon = documents.filter((d) => {
-    if (!d.deletedAt) return false;
-    const daysLeft = (new Date(d.deletedAt).getTime() + retentionDays * day - Date.now()) / day;
-    return daysLeft <= PURGE_WARN_DAYS;
-  });
-  if (soon.length > 0) {
-    await notifyTrashPurge(soon.length, PURGE_WARN_DAYS);
-    setMeta("lastPurgeWarnDay", today);
-  }
-}
-
-// Must be defined at module scope so the background task can run headlessly.
-TaskManager.defineTask(SYNC_TASK, async () => {
-  // WorkManager stops a run at 10 minutes, and a killed run leaves its
-  // progress notification behind. Within this budget the sync pauses itself;
-  // the next run continues where it stopped.
-  const deadline = Date.now() + 7 * 60_000;
-  try {
-    // Files queued while the app was gone go out even without a UI session.
-    await flushUploads().catch(() => {});
-    const s = await getSettings();
-    if (!s.syncEnabled) return BackgroundTask.BackgroundTaskResult.Success;
-    await syncNow({ respectWifiOnly: true, background: true, deadline });
-    setMeta("syncFailStreak", "0");
-    return BackgroundTask.BackgroundTaskResult.Success;
-  } catch (e) {
-    if (e instanceof ApiError && e.status === 401) {
-      notifySessionExpired().catch(() => {});
-    } else {
-      const streak = Number(getMeta("syncFailStreak") ?? "0") + 1;
-      setMeta("syncFailStreak", String(streak));
-      if (streak === 3) notifySyncFailures(streak).catch(() => {});
-    }
-    return BackgroundTask.BackgroundTaskResult.Failed;
-  }
-});
-
-/** (Re-)register or unregister the background job to match settings. */
-export async function applySyncRegistration(): Promise<void> {
-  const s = await getSettings();
-  // expo-task-manager only updates the options of a task that is already
-  // registered: the WorkManager chain keeps its old delay, and a chain broken
-  // by a killed run stays broken until the process restarts. Unregistering
-  // first makes every call reschedule from now with the current interval.
-  await BackgroundTask.unregisterTaskAsync(SYNC_TASK).catch(() => {});
-  if (s.syncEnabled) {
-    await BackgroundTask.registerTaskAsync(SYNC_TASK, { minimumInterval: s.syncIntervalMinutes });
-  }
 }
 
 /**
@@ -538,7 +432,7 @@ export async function wipeOfflineFiles(exportDirUri: string): Promise<void> {
   }
 }
 
-/** Full sign-out: server session (best effort), settings, mirrors, blobs, background job. */
+/** Full sign-out: server session (best effort), settings, mirrors, blobs. */
 export async function signOutEverything(): Promise<void> {
   const s = await getSettings();
   if (s.serverUrl) {
@@ -555,7 +449,6 @@ export async function signOutEverything(): Promise<void> {
   // Only the account is forgotten — device preferences (sync, biometric lock,
   // notifications, date format...) survive until the app is uninstalled.
   await saveSettings({ accountEmail: "", organizationId: "", organizationName: "" });
-  await applySyncRegistration().catch(() => {});
 }
 
 /** Sign-out: drop every organization's mirror (all papra*.db files) and every blob. */

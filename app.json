@@ -26,7 +26,6 @@
       "expo-router",
       "expo-secure-store",
       "expo-sqlite",
-      "expo-background-task",
       "expo-local-authentication",
       "expo-document-picker",
       [

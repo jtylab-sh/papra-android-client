@@ -33,11 +33,11 @@ full offline copy on your phone. Not affiliated with the Papra project.
   pinch-zoom, copy the extracted text, or jump to the document in the web UI.
 - Trash with restore, delete forever and empty trash; rows show the time left before permanent
   deletion.
-- Offline mirror: sync every document on a schedule (15 min to 24 h, Wi-Fi-only option). Syncs are
-  incremental, pause and resume around connectivity loss, can be paused by hand, pick up documents
-  added mid-sync, and manual syncs keep running in a foreground service when you switch apps.
-  Copies can also be exported to a folder of your choice, browsable in any file manager and kept
-  out of the photo gallery. Each document page has its own download / remove-offline toggle.
+- Offline mirror: Sync now downloads every document to this phone. Syncs are incremental, pause and
+  resume around connectivity loss, can be paused by hand, pick up documents added mid-sync, and keep
+  running in a foreground service when you switch apps. Copies can also be exported to a folder of
+  your choice, browsable in any file manager and kept out of the photo gallery. Each document page
+  has its own download / remove-offline toggle.
 - Home is the start page: quick Scan/Upload actions, organization statistics and the most recent
   documents. Long-pressing the app icon offers Scan, Upload and Search shortcuts.
 - Offline awareness: a banner while there is no connectivity, a small toast when an action needs
@@ -81,12 +81,7 @@ Grab the APK from the [latest release](../../releases/latest), or add the repo t
 
 ## Offline sync notes
 
-- The background job runs through Android's WorkManager: the cadence is a minimum. Android picks
-  the exact moment, waits for a network connection, and defers jobs while the phone sleeps (Doze),
-  so a 15-minute cadence can take longer on an idle phone. A run stops itself after 7 minutes and
-  the next one continues where it left off.
-- Force-stopping the app suspends background jobs until the app is opened again. That is Android
-  policy.
+- Sync is manual: Settings, Sync now. There is no scheduled background sync.
 
 ## Development
 

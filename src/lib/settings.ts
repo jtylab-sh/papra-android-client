@@ -12,9 +12,6 @@ export interface Settings {
   organizationId: string;
   organizationName: string;
   syncEnabled: boolean;
-  /** minutes between background syncs */
-  syncIntervalMinutes: number;
-  syncWifiOnly: boolean;
   biometricLock: boolean;
   /** minutes the app stays unlocked after leaving it; 0 = lock immediately */
   lockGraceMinutes: number;
@@ -25,11 +22,6 @@ export interface Settings {
    * API). Only affects countdowns shown in this app — never the server.
    */
   trashRetentionDays: number;
-  /** notification toggles — all opt-in; enabling the first one asks for permission */
-  notifyNewDocuments: boolean;
-  notifySyncFailures: boolean;
-  notifySessionExpired: boolean;
-  notifyTrashPurge: boolean;
   /**
    * Ongoing progress notification during manual syncs. Doubles as the switch
    * for the dataSync foreground service that keeps a sync alive when the app
@@ -75,16 +67,10 @@ export const DEFAULTS: Settings = {
   organizationId: "",
   organizationName: "",
   syncEnabled: false,
-  syncIntervalMinutes: 720,
-  syncWifiOnly: true,
   biometricLock: false,
   lockGraceMinutes: 5,
   offlineExportDirUri: "",
   trashRetentionDays: 30,
-  notifyNewDocuments: false,
-  notifySyncFailures: false,
-  notifySessionExpired: false,
-  notifyTrashPurge: false,
   notifySyncProgress: false,
   updateCheckEnabled: false,
   dateFormat: "system",

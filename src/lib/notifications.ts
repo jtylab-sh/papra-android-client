@@ -7,7 +7,6 @@
  */
 import * as Notifications from "expo-notifications";
 import notifee, { AndroidForegroundServiceType, AndroidImportance, EventType } from "react-native-notify-kit";
-import { getSettings } from "~/lib/settings";
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -53,37 +52,6 @@ async function post(channelId: "sync" | "alerts", title: string, body: string, u
   } catch {
     /* notifications must never break a sync */
   }
-}
-
-export async function notifyNewDocuments(count: number, firstName: string): Promise<void> {
-  if (!(await getSettings()).notifyNewDocuments) return;
-  const title = count === 1 ? "1 new document" : `${count} new documents`;
-  await post("sync", title, count === 1 ? firstName : `${firstName}, …`, "/documents");
-}
-
-export async function notifySyncFailures(streak: number): Promise<void> {
-  if (!(await getSettings()).notifySyncFailures) return;
-  await post("alerts", "Background sync keeps failing", `${streak} runs in a row. Open the app to check.`, "/settings");
-}
-
-export async function notifySessionExpired(): Promise<void> {
-  if (!(await getSettings()).notifySessionExpired) return;
-  await post(
-    "alerts",
-    "Sign in again",
-    "The Papra session expired; background sync is paused until you sign in.",
-    "/sign-in",
-  );
-}
-
-export async function notifyTrashPurge(count: number, withinDays: number): Promise<void> {
-  if (!(await getSettings()).notifyTrashPurge) return;
-  await post(
-    "alerts",
-    "Trash purge soon",
-    `${count} trashed document${count === 1 ? "" : "s"} will be permanently deleted within ${withinDays} day${withinDays === 1 ? "" : "s"}.`,
-    "/trash",
-  );
 }
 
 /**
@@ -159,27 +127,17 @@ export async function startSyncService(): Promise<void> {
   });
 }
 
-/**
- * Progress update. asService=true rides the foreground service (manual syncs);
- * asService=false is a plain ongoing notification — all a background
- * WorkManager run may show (Android 12+ forbids starting a service from there).
- */
-export async function updateSyncProgress(done: number, total: number, asService = true): Promise<void> {
+/** Progress update on the foreground-service notification, at most once a second. */
+export async function updateSyncProgress(done: number, total: number): Promise<void> {
   const now = Date.now();
-  if (done < total && now - lastProgressAt < 1000) return; // at most 1 update/s
+  if (done < total && now - lastProgressAt < 1000) return;
   lastProgressAt = now;
-  const { asForegroundService, foregroundServiceTypes, ...plain } = FGS_ANDROID;
   await notifee.displayNotification({
     id: SYNC_PROGRESS_ID,
     title: "Syncing documents",
     body: `Checked ${done} of ${total}`,
-    android: { ...(asService ? FGS_ANDROID : plain), progress: { max: total, current: done } },
+    android: { ...FGS_ANDROID, progress: { max: total, current: done } },
   });
-}
-
-/** Remove the plain progress notification after a background sync. */
-export async function clearSyncNotification(): Promise<void> {
-  await notifee.cancelNotification(SYNC_PROGRESS_ID).catch(() => {});
 }
 
 export async function stopSyncService(): Promise<void> {
@@ -194,7 +152,7 @@ export async function stopSyncService(): Promise<void> {
 const UPLOAD_PROGRESS_ID = "upload-progress";
 const UPLOAD_FGS_ANDROID = fgsAndroid(UPLOAD_PROGRESS_ID);
 
-/** asService=false for background runs (Android 12+ forbids starting one there). */
+/** asService=false when the app is not in the foreground (Android 12+ forbids starting a service there). */
 export async function updateUploadProgress(done: number, total: number, name: string, asService = true): Promise<void> {
   try {
     await notifee.createChannel({

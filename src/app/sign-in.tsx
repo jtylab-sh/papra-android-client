@@ -7,7 +7,6 @@ import { spacing, type AppTheme } from "~/constants/theme";
 import { getAuthClient } from "~/lib/auth";
 import { listOrganizations, type PapraOrganization } from "~/lib/papra";
 import { getSettings, normalizeServerUrl, saveSettings, type Settings } from "~/lib/settings";
-import { applySyncRegistration } from "~/lib/sync";
 
 type Step = "credentials" | "totp" | "org";
 
@@ -33,7 +32,6 @@ export default function SignInScreen() {
 
   const finish = useCallback(async (settings: Settings, org: PapraOrganization) => {
     await saveSettings({ ...settings, organizationId: org.id, organizationName: org.name });
-    await applySyncRegistration().catch(() => {});
     router.replace("/");
   }, []);
 
