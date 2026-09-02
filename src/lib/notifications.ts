@@ -226,3 +226,13 @@ export async function stopUploadNotification(): Promise<void> {
   await notifee.stopForegroundService().catch(() => {});
   await notifee.cancelNotification(UPLOAD_PROGRESS_ID).catch(() => {});
 }
+
+/**
+ * Startup hygiene: a run that died with its process leaves an ongoing progress
+ * notification the user cannot swipe away. Call only when nothing is running.
+ */
+export async function clearProgressNotifications(): Promise<void> {
+  for (const id of [SYNC_PROGRESS_ID, UPLOAD_PROGRESS_ID]) {
+    await notifee.cancelNotification(id).catch(() => {});
+  }
+}

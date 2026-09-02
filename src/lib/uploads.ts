@@ -77,6 +77,8 @@ export interface FlushResult {
 
 /** Send everything in the queue. Safe to call any time; null when already running. */
 let flushing = false; // foreground + reconnect + manual can overlap
+
+export const isFlushing = (): boolean => flushing;
 export async function flushUploads(): Promise<FlushResult | null> {
   if (flushing) return null;
   flushing = true;

@@ -338,6 +338,8 @@ export interface SyncResult {
 
 let inFlight: Promise<SyncResult> | null = null;
 
+export const isSyncing = (): boolean => inFlight !== null;
+
 /**
  * One sync at a time: the background task and "Sync now" overlapping would
  * export the same new documents twice. A caller joining a running sync gets
@@ -358,6 +360,8 @@ async function runSync(
     onProgress?: (done: number, total: number) => void;
     /** background runs may notify; foreground runs never do (user sees the UI) */
     background?: boolean;
+    /** epoch ms: past it the run pauses itself and the next one continues */
+    deadline?: number;
   } = {},
 ): Promise<SyncResult> {
   const s = await getSettings();
@@ -402,7 +406,7 @@ async function runSync(
     // constant stream of uploads can't keep the loop alive forever).
     for (let round = 0; round < 3 && queue.length > 0 && !paused; round++) {
       for (const id of queue) {
-        if (pauseRequested) {
+        if (pauseRequested || Date.now() > (opts.deadline ?? Infinity)) {
           paused = true;
           break;
         }
@@ -463,12 +467,16 @@ async function checkTrashPurge(retentionDays: number): Promise<void> {
 
 // Must be defined at module scope so the background task can run headlessly.
 TaskManager.defineTask(SYNC_TASK, async () => {
+  // WorkManager stops a run at 10 minutes, and a killed run leaves its
+  // progress notification behind. Within this budget the sync pauses itself;
+  // the next run continues where it stopped.
+  const deadline = Date.now() + 7 * 60_000;
   try {
     // Files queued while the app was gone go out even without a UI session.
     await flushUploads().catch(() => {});
     const s = await getSettings();
     if (!s.syncEnabled) return BackgroundTask.BackgroundTaskResult.Success;
-    await syncNow({ respectWifiOnly: true, background: true });
+    await syncNow({ respectWifiOnly: true, background: true, deadline });
     setMeta("syncFailStreak", "0");
     return BackgroundTask.BackgroundTaskResult.Success;
   } catch (e) {

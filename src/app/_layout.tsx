@@ -13,12 +13,12 @@ import { PaperProvider, Text } from "react-native-paper";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button, Muted, Screen, Title } from "~/components/ui";
 import { useAppTheme } from "~/constants/theme";
-import { wireNotificationNavigation } from "~/lib/notifications";
+import { clearProgressNotifications, wireNotificationNavigation } from "~/lib/notifications";
 import { useOnReconnect } from "~/lib/network";
 import { getSettings } from "~/lib/settings";
-import { flushUploads } from "~/lib/uploads";
+import { flushUploads, isFlushing } from "~/lib/uploads";
 // Side effect: defines the background sync task at module scope.
-import { signOutEverything } from "~/lib/sync";
+import { isSyncing, signOutEverything } from "~/lib/sync";
 import { maybePromptUpdate } from "~/lib/version";
 
 export default function RootLayout() {
@@ -53,7 +53,9 @@ export default function RootLayout() {
   }, []);
 
   // Files queued while offline: send on start and whenever we come back online.
+  // First drop a progress notification left behind by a run the OS killed.
   useEffect(() => {
+    if (!isSyncing() && !isFlushing()) clearProgressNotifications().catch(() => {});
     flushUploads().catch(() => {});
   }, []);
   useOnReconnect(() => {

@@ -1,4 +1,5 @@
 import * as FileSystemLegacy from "expo-file-system/legacy";
+import { useFocusEffect } from "expo-router";
 import * as LocalAuthentication from "expo-local-authentication";
 import { useCallback, useEffect, useState } from "react";
 import { Alert, ScrollView, View } from "react-native";
@@ -18,7 +19,7 @@ import { getAuthClient } from "~/lib/auth";
 import { requestNotificationPermission } from "~/lib/notifications";
 import { createOrganization, getServerVersion, listOrganizations, type PapraOrganization } from "~/lib/papra";
 import { countCachedDocuments, getMeta } from "~/lib/db";
-import { countOfflineOnDisk } from "~/lib/sync";
+import { countOfflineOnDisk, isSyncing } from "~/lib/sync";
 import { getSettings, saveSettings, type Settings } from "~/lib/settings";
 import {
   applySyncRegistration,
@@ -60,6 +61,21 @@ export default function SettingsScreen() {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [progress, setProgress] = useState<string>("");
   const [syncing, setSyncing] = useState(false);
+  // Drawer screens stay mounted: re-read "Last sync" and the counts when the
+  // page gains focus, and follow a background sync while one runs.
+  const [, rerender] = useState(0);
+  useFocusEffect(
+    useCallback(() => {
+      rerender((n) => n + 1);
+      let was = false;
+      const t = setInterval(() => {
+        const now = isSyncing();
+        if (now || was) rerender((n) => n + 1);
+        was = now;
+      }, 1000);
+      return () => clearInterval(t);
+    }, []),
+  );
   const [serverVersion, setServerVersion] = useState("");
   const lastSyncAt = getMeta("lastSyncAt");
 
@@ -346,6 +362,7 @@ export default function SettingsScreen() {
           <Button label="Sync now" kind="ghost" onPress={runSync} loading={syncing} />
           {syncing ? <Button label="Pause" kind="ghost" onPress={requestSyncPause} /> : null}
           {progress ? <Muted>{progress}</Muted> : null}
+          {!syncing && isSyncing() ? <Muted>Background sync running…</Muted> : null}
           <Muted>
             Offline: {countOfflineOnDisk()} of {countCachedDocuments()} documents on this phone
           </Muted>
